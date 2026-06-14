@@ -113,7 +113,7 @@ async def get_manifest(token: str, token_data: dict = Depends(verify_token)):
         resources = ["stream"]
         catalogs = []
     else:
-        resources = ["catalog", "meta", "stream", "subtitles"]
+        resources = ["catalog", "meta", "stream"]
         catalogs = [
             {
                 "type": "movie",
@@ -648,90 +648,3 @@ async def get_streams(
             s["name"] = f"{s['name']} ({seen[s['name']]})"
 
     return {"streams": streams}
-@router.get("/{token}/subtitles/{media_type}/{id}.json")
-async def get_subtitles(
-    token: str,
-    media_type: str,
-    id: str,
-    token_data: dict = Depends(verify_token)
-):
-    try:
-        parts = id.split(":")
-        imdb_id = parts[0]
-        season_num = int(parts[1]) if len(parts) > 1 else None
-        episode_num = int(parts[2]) if len(parts) > 2 else None
-    except (ValueError, IndexError):
-        raise HTTPException(status_code=400, detail="Invalid ID format")
-    media_details = await db.get_media_details(
-        imdb_id=imdb_id,
-        season_number=season_num,
-        episode_number=episode_num
-    )
-    if not media_details or "subtitles" not in media_details:
-        return {"subtitles": []}
-    subtitles = []
-    for sub in media_details.get("subtitles", []):
-        sub_id = sub.get("id")
-        if sub_id:
-            subtitle_url = f"{BASE_URL}/sub/{token}/{sub_id}/{sub.get('name', 'subtitle.srt')}"
-            subtitles.append({
-                "id": sub_id,
-                "url": subtitle_url,
-                "language": sub.get("language", "en"),
-                "name": sub.get("language_name", "Unknown"),
-                "type": sub.get("type", "srt"),
-                "format": sub.get("type", "srt")
-            })
-    return {"subtitles": subtitles}
-
-@router.get("/{token}/subtitles/{media_type}/{id}.json")
-async def get_subtitles(
-    token: str,
-    media_type: str,
-    id: str,
-    token_data: dict = Depends(verify_token)
-):
-    try:
-        parts = id.split(":")
-        imdb_id = parts[0]
-        season_num = int(parts[1]) if len(parts) > 1 else None
-        episode_num = int(parts[2]) if len(parts) > 2 else None
-    except (ValueError, IndexError):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-    media_details = await db.get_media_details(
-        imdb_id=imdb_id, season_number=season_num, episode_number=episode_num
-    )
-    if not media_details or "subtitles" not in media_details:
-        return {"subtitles": []}
-    subtitles = []
-    for sub in media_details.get("subtitles", []):
-        sub_id = sub.get("id")
-        if sub_id:
-            subtitles.append({
-                "id": sub_id,
-                "url": f"{BASE_URL}/sub/{token}/{sub_id}/{sub.get('name','sub.srt')}",
-                "language": sub.get("language", "en"),
-                "name": sub.get("language_name", "Unknown"),
-                "type": sub.get("type", "srt"),
-                "format": sub.get("type", "srt")
-            })
-    return {"subtitles": subtitles}
-
-@router.get("/{token}/subtitles/{media_type}/{id}.json")
-async def get_subtitles(token: str, media_type: str, id: str, token_data: dict = Depends(verify_token)):
-    try:
-        parts = id.split(":")
-        imdb_id = parts[0]
-        season_num = int(parts[1]) if len(parts) > 1 else None
-        episode_num = int(parts[2]) if len(parts) > 2 else None
-    except (ValueError, IndexError):
-        raise HTTPException(status_code=400, detail="Invalid ID")
-    media_details = await db.get_media_details(imdb_id=imdb_id, season_number=season_num, episode_number=episode_num)
-    if not media_details or "subtitles" not in media_details:
-        return {"subtitles": []}
-    subtitles = []
-    for sub in media_details.get("subtitles", []):
-        sub_id = sub.get("id")
-        if sub_id:
-            subtitles.append({"id": sub_id, "url": f"{BASE_URL}/sub/{token}/{sub_id}/{sub.get('name','sub.srt')}", "language": sub.get("language", "en"), "name": sub.get("language_name", "Unknown"), "type": sub.get("type", "srt"), "format": sub.get("type", "srt")})
-    return {"subtitles": subtitles}
