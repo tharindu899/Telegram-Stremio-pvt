@@ -1703,3 +1703,154 @@ class Database:
 
         updated_doc = await collection.find_one({"tmdb_id": new_tmdb_id})
         return convert_objectid_to_str(updated_doc) if updated_doc else None
+
+
+
+    # ======================
+    # SUBTITLE METHODS (NEW)
+    # ======================
+
+    async def insert_subtitle(self, subtitle_info: dict):
+        """Insert subtitle file into database and associate with media"""
+        try:
+            video_encoded = subtitle_info.get('video_encoded')
+            
+            for i in range(1, self.current_db_index + 1):
+                storage = self.dbs.get(f"storage_{i}")
+                if storage is None:
+                    continue
+                
+                # Check movies
+                movie = await storage["movie"].find_one({
+                    "telegram.id": video_encoded
+                })
+                if movie:
+                    from Backend.helper.modal import SubtitleDetail
+                    subtitle_detail = SubtitleDetail(
+                        id=subtitle_info['encoded_string'],
+                        name=subtitle_info['name'],
+                        size=subtitle_info['size'],
+                        language=subtitle_info['language'],
+                        format=subtitle_info['format']
+                    )
+                    
+                    if 'subtitles' not in movie:
+                        movie['subtitles'] = []
+                    movie['subtitles'].append(subtitle_detail.dict())
+                    
+                    await storage["movie"].replace_one(
+                        {"_id": movie["_id"]}, movie
+                    )
+                    LOGGER.info(f"Added subtitle to movie: {movie.get('title')}")
+                    return movie["_id"]
+                
+                # Check TV episodes
+                tv_show = await storage["tv"].find_one({
+                    "seasons.episodes.telegram.id": video_encoded
+                })
+                if tv_show:
+                    from Backend.helper.modal import SubtitleDetail
+                    for season in tv_show.get("seasons", []):
+                        for episode in season.get("episodes", []):
+                            if any(q.get("id") == video_encoded for q in episode.get("telegram", [])):
+                                subtitle_detail = SubtitleDetail(
+                                    id=subtitle_info['encoded_string'],
+                                    name=subtitle_info['name'],
+                                    size=subtitle_info['size'],
+                                    language=subtitle_info['language'],
+                                    format=subtitle_info['format']
+                                )
+                                
+                                if 'subtitles' not in episode:
+                                    episode['subtitles'] = []
+                                episode['subtitles'].append(subtitle_detail.dict())
+                                
+                                await storage["tv"].replace_one(
+                                    {"_id": tv_show["_id"]}, tv_show
+                                )
+                                LOGGER.info(f"Added subtitle to TV episode")
+                                return tv_show["_id"]
+            
+            LOGGER.warning(f"Could not find associated video for subtitle")
+            return None
+            
+        except Exception as e:
+            LOGGER.error(f"Error inserting subtitle: {e}")
+            return None
+
+    async def get_subtitles_for_media(
+        self,
+        imdb_id: str,
+        media_type: str = "movie",
+        season: int = None,
+        episode: int = None
+    ):
+        """Retrieve all subtitles for a specific media item"""
+        subtitles = []
+        
+        for i in range(1, self.current_db_index + 1):
+            storage = self.dbs.get(f"storage_{i}")
+            if storage is None:
+                continue
+            
+            if media_type == "movie":
+                movie = await storage["movie"].find_one({"imdb_id": imdb_id})
+                if movie and movie.get("subtitles"):
+                    subtitles.extend(movie["subtitles"])
+            else:
+                tv_show = await storage["tv"].find_one({"imdb_id": imdb_id})
+                if tv_show:
+                    for season_data in tv_show.get("seasons", []):
+                        if season and season_data.get("season_number") != season:
+                            continue
+                        for episode_data in season_data.get("episodes", []):
+                            if episode and episode_data.get("episode_number") != episode:
+                                continue
+                            if episode_data.get("subtitles"):
+                                subtitles.extend(episode_data["subtitles"])
+        
+        return subtitles
+
+    async def delete_subtitles_by_stream_id(self, stream_id_hash: str):
+        """Delete subtitles associated with a specific stream"""
+        deleted_count = 0
+        
+        for i in range(1, self.current_db_index + 1):
+            storage = self.dbs.get(f"storage_{i}")
+            if storage is None:
+                continue
+            
+            # Delete from movies
+            movies = await storage["movie"].find({}).to_list(None)
+            for movie in movies:
+                if movie.get("subtitles"):
+                    original_count = len(movie["subtitles"])
+                    movie["subtitles"] = [
+                        s for s in movie["subtitles"] if s.get("id") != stream_id_hash
+                    ]
+                    if len(movie["subtitles"]) < original_count:
+                        await storage["movie"].replace_one(
+                            {"_id": movie["_id"]}, movie
+                        )
+                        deleted_count += original_count - len(movie["subtitles"])
+            
+            # Delete from TV shows
+            tv_shows = await storage["tv"].find({}).to_list(None)
+            for tv_show in tv_shows:
+                modified = False
+                for season in tv_show.get("seasons", []):
+                    for episode in season.get("episodes", []):
+                        if episode.get("subtitles"):
+                            original_count = len(episode["subtitles"])
+                            episode["subtitles"] = [
+                                s for s in episode["subtitles"] if s.get("id") != stream_id_hash
+                            ]
+                            if len(episode["subtitles"]) < original_count:
+                                modified = True
+                
+                if modified:
+                    await storage["tv"].replace_one(
+                        {"_id": tv_show["_id"]}, tv_show
+                    )
+        
+        return deleted_count

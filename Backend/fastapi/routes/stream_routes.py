@@ -414,6 +414,53 @@ async def media_streamer(
     )
 
 
+
+
+@router.get("/dl/{token}/{id}/subtitle")
+@router.head("/dl/{token}/{id}/subtitle")
+async def subtitle_stream_handler(
+    request: Request,
+    token: str,
+    id: str,
+    token_data: dict = Depends(verify_token),
+):
+    """Stream subtitle files"""
+    decoded = await decode_string(id)
+    msg_id = decoded.get("msg_id")
+    if not msg_id:
+        raise HTTPException(status_code=400, detail="Missing id")
+
+    chat_id = int(f"-100{decoded['chat_id']}")
+    
+    # Get file info
+    index = select_best_client(0)
+    tg_client = multi_clients[index]
+    if tg_client not in _streamer_by_client:
+        _streamer_by_client[tg_client] = ByteStreamer(tg_client, index)
+    streamer: ByteStreamer = _streamer_by_client[tg_client]
+
+    file_id = await streamer.get_file_properties(chat_id=chat_id, message_id=msg_id)
+    
+    # Set content type based on file extension
+    mime_type = "text/plain"
+    if file_id.file_name:
+        if file_id.file_name.endswith('.srt'):
+            mime_type = "application/x-subrip"
+        elif file_id.file_name.endswith(('.ass', '.ssa')):
+            mime_type = "text/x-ssa"
+        elif file_id.file_name.endswith('.vtt'):
+            mime_type = "text/vtt"
+    
+    # Stream the subtitle file
+    return await media_streamer(
+        request=request,
+        chat_id=chat_id,
+        msg_id=int(msg_id),
+        secure_hash="SKIP_HASH_CHECK",
+        token=token,
+        token_data=token_data,
+        stream_id_hash=id,
+    )
 @router.get("/stream/stats")
 async def get_stream_stats():
     now = time.time()
