@@ -183,8 +183,6 @@ async def file_receive_handler(client: Client, message: Message):
                     ))
 
                 await file_queue.put((metadata_info, int(channel), msg_id, size, title))
-            else:
-                await message.reply_text("> Not supported")
         except FloodWait as e:
             LOGGER.info(f"Sleeping for {str(e.value)}s")
             await asleep(e.value)
