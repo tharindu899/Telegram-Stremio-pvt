@@ -50,11 +50,6 @@ def get_subtitle_type(filename: str) -> str:
     return "srt"
 
 async def handle_subtitle_message(client, message):
-    if message.document:
-        file_name = message.document.file_name or ""
-        if is_subtitle_file(file_name):
-            await handle_subtitle_message(client, message)
-            return
     try:
         file_name = message.document.file_name or ""
         file_id = message.document.file_id

@@ -1,3 +1,4 @@
+from datetime import datetime, timezone
 import secrets
 import string
 from asyncio import create_task
@@ -1703,3 +1704,62 @@ class Database:
 
         updated_doc = await collection.find_one({"tmdb_id": new_tmdb_id})
         return convert_objectid_to_str(updated_doc) if updated_doc else None
+
+    async def add_subtitle(self, imdb_id: str, media_type: str, subtitle_data: dict) -> bool:
+        try:
+            collection = self.db[f"{media_type}_media"]
+            subtitle_id = f"{imdb_id}_{subtitle_data.get('msg_id', 'unknown')}"
+            subtitle_doc = {
+                "id": subtitle_id, "msg_id": subtitle_data.get("msg_id"),
+                "chat_id": subtitle_data.get("chat_id"), "file_id": subtitle_data.get("file_id"),
+                "name": subtitle_data.get("name", "subtitle.srt"),
+                "language": subtitle_data.get("language", "en"),
+                "language_name": subtitle_data.get("language_name", "Unknown"),
+                "type": subtitle_data.get("type", "srt"), "size": subtitle_data.get("size", ""),
+                "added_date": datetime.now(timezone.utc)
+            }
+            if media_type == "tv":
+                subtitle_doc["season"] = subtitle_data.get("season")
+                subtitle_doc["episode"] = subtitle_data.get("episode")
+            query = {"imdb_id": imdb_id}
+            update = {"$addToSet": {"subtitles": subtitle_doc}}
+            result = await collection.update_one(query, update)
+            if result.matched_count == 0:
+                await collection.insert_one({
+                    "imdb_id": imdb_id, "media_type": media_type,
+                    "subtitles": [subtitle_doc], "added_date": datetime.now(timezone.utc)
+                })
+                return True
+            return result.modified_count > 0
+        except Exception as e:
+            LOGGER.error(f"Error adding subtitle: {e}")
+            return False
+
+    async def get_subtitles(self, imdb_id: str, media_type: str, season: int = None, episode: int = None) -> list:
+        try:
+            collection = self.db[f"{media_type}_media"]
+            query = {"imdb_id": imdb_id}
+            if season is not None: query["telegram.season"] = season
+            if episode is not None: query["telegram.episode"] = episode
+            media_doc = await collection.find_one(query)
+            if media_doc and "subtitles" in media_doc:
+                subtitles = media_doc["subtitles"]
+                if season is not None or episode is not None:
+                    return [s for s in subtitles if (season is None or s.get("season") == season) and (episode is None or s.get("episode") == episode)]
+                return subtitles
+            return []
+        except Exception as e:
+            LOGGER.error(f"Error getting subtitles: {e}")
+            return []
+
+    async def delete_subtitle(self, imdb_id: str, media_type: str, subtitle_id: str) -> bool:
+        try:
+            collection = self.db[f"{media_type}_media"]
+            result = await collection.update_one(
+                {"imdb_id": imdb_id},
+                {"$pull": {"subtitles": {"id": subtitle_id}}}
+            )
+            return result.modified_count > 0
+        except Exception as e:
+            LOGGER.error(f"Error deleting subtitle: {e}")
+            return False
