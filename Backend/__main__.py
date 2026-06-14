@@ -6,10 +6,21 @@ from pyrogram import idle
 from Backend import __version__, db
 from Backend.helper.pinger import ping
 from Backend.logger import LOGGER
+from Backend.config import Telegram
 from Backend.fastapi import server
 from Backend.helper.pyro import restart_notification, setup_bot_commands
 from Backend.pyrofork.bot import Helper, StreamBot
 from Backend.pyrofork.clients import initialize_clients
+from Backend.pyrofork.plugins.channels import _load_channels_from_db
+from Backend.helper.subscription_checker import subscription_checker_loop
+from Backend.helper.link_checker import DeadLinkChecker
+from Backend.fastapi.main import app
+from Backend.helper.auto_catalog import (
+    start_auto_catalog_sync_background, start_auto_catalog_interval_loop,
+    AUTO_SYNC_DELAY_SECONDS, AUTO_CATALOG_ON_STARTUP,
+    AUTO_CATALOG_FULL_REBUILD_ON_STARTUP
+)
+
 
 loop = get_event_loop()
 
@@ -35,6 +46,9 @@ async def start_services():
         await initialize_clients()
         await asleep(2)
 
+        await _load_channels_from_db()
+        await asleep(2)
+        
         await setup_bot_commands(StreamBot)
         await asleep(2)
 
@@ -42,6 +56,22 @@ async def start_services():
         await restart_notification()
         loop.create_task(server.serve())
         loop.create_task(ping())
+        
+        link_checker_task = DeadLinkChecker(db, app, check_interval_hours=24)
+        loop.create_task(link_checker_task.start())
+
+        if AUTO_CATALOG_ON_STARTUP:
+            loop.create_task(start_auto_catalog_sync_background(
+                db,
+                delay_seconds=AUTO_SYNC_DELAY_SECONDS,
+                full_rebuild=AUTO_CATALOG_FULL_REBUILD_ON_STARTUP,
+            ))
+
+        loop.create_task(start_auto_catalog_interval_loop(db))
+        
+        if Telegram.SUBSCRIPTION:
+            loop.create_task(subscription_checker_loop(StreamBot))
+            LOGGER.info("Subscription Checker Task Started.")
         
         LOGGER.info("Telegram-Stremio Started Successfully!")
         await idle()

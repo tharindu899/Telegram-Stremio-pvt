@@ -4,5 +4,13 @@ from Backend.fastapi.main import app
 
 
 Port = Telegram.PORT
-config = uvicorn.Config(app=app, host='0.0.0.0', port=Port)
+config = uvicorn.Config(
+    app=app,
+    host="0.0.0.0",
+    port=Port,
+    loop="uvloop",
+    http="httptools",
+    timeout_keep_alive=30,
+    timeout_graceful_shutdown=5,
+)
 server = uvicorn.Server(config)

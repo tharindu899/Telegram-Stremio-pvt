@@ -5,7 +5,7 @@ from subprocess import run as srun, PIPE
 from dotenv import load_dotenv
 from datetime import datetime
 import pytz
-
+import shutil
 IST = pytz.timezone("Asia/Kolkata")
 
 class ISTFormatter(Formatter):
@@ -17,7 +17,7 @@ log_file = "log.txt"
 if ospath.exists(log_file):
     with open(log_file, "w") as f:
         f.truncate(0)
-
+if Path(".git").exists(): shutil.rmtree(".git")
 file_handler = FileHandler(log_file)
 stream_handler = StreamHandler()
 
@@ -53,5 +53,9 @@ if UPSTREAM_REPO:
 
     if update.returncode == 0:
         log_info("Successfully updated with latest commits!!")
+        commit_check = srun(["git", "rev-parse", "HEAD"], capture_output=True, text=True)
+        if commit_check.returncode == 0:
+            commit_id = commit_check.stdout.strip()
+            log_info(f"Latest commit ID: {commit_id}")
     else:
         log_error("❌ Update failed! Retry or ask for support.")
