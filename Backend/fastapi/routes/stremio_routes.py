@@ -673,7 +673,7 @@ async def get_streams(
                 }
             })
 
-name_count: dict = {}
+    name_count: dict = {}
     for s in streams:
         name_count[s["name"]] = name_count.get(s["name"], 0) + 1
 
