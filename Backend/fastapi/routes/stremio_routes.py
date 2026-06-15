@@ -110,10 +110,10 @@ def get_resolution_priority(stream_name: str) -> int:
 @router.get("/{token}/manifest.json")
 async def get_manifest(token: str, token_data: dict = Depends(verify_token)):
     if Telegram.HIDE_CATALOG:
-        resources = ["stream"]
+        resources = ["stream", "subtitles"]
         catalogs = []
     else:
-        resources = ["catalog", "meta", "stream"]
+        resources = ["catalog", "meta", "stream", "subtitles"]
         catalogs = [
             {
                 "type": "movie",
@@ -648,3 +648,62 @@ async def get_streams(
             s["name"] = f"{s['name']} ({seen[s['name']]})"
 
     return {"streams": streams}
+
+
+# ─────────────────────────────────────────────────────────────
+# Subtitles endpoint
+# ─────────────────────────────────────────────────────────────
+
+_LANG_NAMES = {
+    "en": "English", "si": "Sinhala", "ta": "Tamil", "hi": "Hindi",
+    "fr": "French", "de": "German", "es": "Spanish", "ja": "Japanese",
+    "ko": "Korean", "zh": "Chinese", "ar": "Arabic", "pt": "Portuguese",
+    "ru": "Russian", "it": "Italian", "nl": "Dutch", "tr": "Turkish",
+}
+
+
+@router.get("/{token}/subtitles/{media_type}/{id}.json")
+async def get_subtitles(
+    token: str,
+    media_type: str,
+    id: str,
+    token_data: dict = Depends(verify_token),
+):
+    """
+    Stremio subtitles endpoint.
+    id formats:
+      movies  → tt1234567
+      series  → tt1234567:1:2   (season:episode)
+    Returns subtitle URLs pointing at /sub/{token}/{id}/subtitle.vtt
+    (SRT files are auto-converted to VTT by the serving route).
+    """
+    try:
+        parts = id.split(":")
+        imdb_id    = parts[0]
+        season_num  = int(parts[1]) if len(parts) > 1 else None
+        episode_num = int(parts[2]) if len(parts) > 2 else None
+    except (ValueError, IndexError):
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    subs = await db.get_subtitles(
+        imdb_id=imdb_id,
+        season_number=season_num,
+        episode_number=episode_num,
+    )
+
+    result = []
+    for sub in subs:
+        sub_id  = sub.get("id", "")
+        lang    = sub.get("language", "en")
+        fmt     = sub.get("format", "srt")
+        # Always serve as .vtt — the stream route converts SRT on-the-fly
+        url = f"{BASE_URL}/sub/{token}/{sub_id}/subtitle.vtt"
+        result.append({
+            "id":   f"tg-{sub_id}",
+            "url":  url,
+            "lang": lang,
+            # Human-readable language label shown in Stremio's subtitle picker
+            "name": _LANG_NAMES.get(lang, lang.upper()),
+        })
+
+    return {"subtitles": result}

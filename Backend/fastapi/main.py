@@ -12,7 +12,7 @@ from Backend.fastapi.routes.template_routes import (
     login_page, login_post, logout, set_theme, dashboard_page,
     media_management_page, edit_media_page, public_status_page, stremio_guide_page,
     admin_dashboard_page, admin_subscriptions_page, admin_access_page,
-    custom_catalogs_page
+    custom_catalogs_page, subtitle_manage_page
 )
 from Backend.fastapi.routes.api_routes import (
     list_media_api, delete_media_api, update_media_api,
@@ -31,7 +31,8 @@ from Backend.fastapi.routes.api_routes import (
     delete_custom_catalog_api, get_custom_catalog_items_api, search_catalog_media_api,
     add_custom_catalog_item_api, remove_custom_catalog_item_api,
     auto_sync_custom_catalogs_api, auto_catalog_sync_status_api,
-    get_auto_catalog_settings_api, update_auto_catalog_settings_api
+    get_auto_catalog_settings_api, update_auto_catalog_settings_api,
+    get_subtitles_api, delete_subtitle_api, search_media_for_subtitles_api
 )
 
 templates = Jinja2Templates(directory="Backend/fastapi/templates")
@@ -371,6 +372,39 @@ async def remove_custom_catalog_item(
     _: bool = Depends(require_auth)
 ):
     return await remove_custom_catalog_item_api(catalog_id, tmdb_id, db_index, media_type)
+
+
+# ─── Subtitle Management ──────────────────────────────────────
+@app.get("/subtitles/manage", response_class=HTMLResponse)
+async def subtitle_manage(request: Request, _: bool = Depends(require_auth)):
+    return await subtitle_manage_page(request, _)
+
+@app.get("/api/subtitles/search/media")
+async def search_media_for_subtitles(
+    q: str,
+    media_type: str = "movie",
+    _: bool = Depends(require_auth)
+):
+    return await search_media_for_subtitles_api(q, media_type)
+
+@app.get("/api/subtitles/{imdb_id}")
+async def get_subtitles(
+    imdb_id: str,
+    season: int | None = None,
+    episode: int | None = None,
+    _: bool = Depends(require_auth)
+):
+    return await get_subtitles_api(imdb_id, season, episode)
+
+@app.delete("/api/subtitles/{imdb_id}/{subtitle_id}")
+async def delete_subtitle(
+    imdb_id: str,
+    subtitle_id: str,
+    season: int | None = None,
+    episode: int | None = None,
+    _: bool = Depends(require_auth)
+):
+    return await delete_subtitle_api(imdb_id, subtitle_id, season, episode)
 
 @app.exception_handler(401)
 async def auth_exception_handler(request: Request, exc):

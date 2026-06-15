@@ -965,3 +965,82 @@ async def update_auto_catalog_settings_api(payload: dict):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+# ─────────────────────────────────────────────────────────────
+# Subtitle Management API
+# ─────────────────────────────────────────────────────────────
+
+async def get_subtitles_api(
+    imdb_id: str,
+    season: int | None = None,
+    episode: int | None = None,
+):
+    """List all subtitles for a movie or TV episode."""
+    try:
+        subs = await db.get_subtitles(
+            imdb_id=imdb_id,
+            season_number=season,
+            episode_number=episode,
+        )
+        return {"subtitles": subs}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def delete_subtitle_api(
+    imdb_id: str,
+    subtitle_id: str,
+    season: int | None = None,
+    episode: int | None = None,
+):
+    """Remove a single subtitle entry from a movie or TV episode."""
+    try:
+        for db_idx in range(db.current_db_index, 0, -1):
+            db_key = f"storage_{db_idx}"
+            _db = db.dbs[db_key]
+
+            if season is not None and episode is not None:
+                tv = await _db["tv"].find_one({"imdb_id": imdb_id})
+                if not tv:
+                    continue
+                found = False
+                for s in tv.get("seasons", []):
+                    if s.get("season_number") != season:
+                        continue
+                    for ep in s.get("episodes", []):
+                        if ep.get("episode_number") != episode:
+                            continue
+                        before = len(ep.get("subtitles", []))
+                        ep["subtitles"] = [x for x in ep.get("subtitles", []) if x.get("id") != subtitle_id]
+                        found = len(ep["subtitles"]) < before
+                if found:
+                    await _db["tv"].replace_one({"imdb_id": imdb_id}, tv)
+                    return {"message": "Subtitle deleted."}
+            else:
+                movie = await _db["movie"].find_one({"imdb_id": imdb_id})
+                if not movie:
+                    continue
+                before = len(movie.get("subtitles", []))
+                movie["subtitles"] = [x for x in movie.get("subtitles", []) if x.get("id") != subtitle_id]
+                if len(movie["subtitles"]) < before:
+                    await _db["movie"].replace_one({"imdb_id": imdb_id}, movie)
+                    return {"message": "Subtitle deleted."}
+
+        raise HTTPException(status_code=404, detail="Subtitle not found.")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def search_media_for_subtitles_api(
+    q: str,
+    media_type: str = "movie",
+):
+    """Search movies/TV shows to populate the subtitle admin picker."""
+    try:
+        results = await db.search_media(query=q, media_type=media_type, page=1, limit=12)
+        return {"results": results}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

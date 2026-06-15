@@ -13,6 +13,16 @@ class QualityDetail(BaseModel):
 
 
 # ---------------------------
+# Subtitle Detail Schema
+# ---------------------------
+class SubtitleDetail(BaseModel):
+    id: str            # encoded hash (chat_id + msg_id)
+    language: str      # ISO 639-1 code: "en", "si", "fr", etc.
+    name: str          # original filename
+    format: str        # "srt", "vtt", "ass", "sub"
+
+
+# ---------------------------
 # Episode Schema
 # ---------------------------
 class Episode(BaseModel):
@@ -22,6 +32,7 @@ class Episode(BaseModel):
     overview: Optional[str] = None
     released: Optional[str] = None
     telegram: Optional[List[QualityDetail]]
+    subtitles: Optional[List[SubtitleDetail]] = Field(default_factory=list)
 
 
 # ---------------------------
@@ -74,3 +85,4 @@ class MovieSchema(BaseModel):
     media_type: str
     updated_on: datetime = Field(default_factory=datetime.utcnow)
     telegram: Optional[List[QualityDetail]]
+    subtitles: Optional[List[SubtitleDetail]] = Field(default_factory=list)

@@ -509,3 +509,146 @@ async def get_stream_detail(stream_id: str):
             return JSONResponse(make_json_safe(rec))
 
     raise HTTPException(status_code=404, detail="Stream not found")
+
+
+# ─────────────────────────────────────────────────────────────
+# Subtitle serving route
+# /sub/{token}/{subtitle_id}/subtitle.vtt
+# Streams the raw subtitle file from Telegram and converts
+# SRT → VTT on-the-fly so Stremio can display it.
+# ─────────────────────────────────────────────────────────────
+
+def _srt_to_vtt(srt_bytes: bytes) -> bytes:
+    """Convert SRT subtitle bytes to WebVTT format."""
+    try:
+        text = srt_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = srt_bytes.decode("latin-1", errors="replace")
+
+    lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+    out = ["WEBVTT", ""]
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        # Skip cue-number lines (pure digits)
+        if line.isdigit():
+            i += 1
+            continue
+        # Timestamp line: convert "," decimal separator → "."
+        if "-->" in line:
+            out.append(line.replace(",", "."))
+            i += 1
+            # Copy text lines until blank line
+            while i < len(lines) and lines[i].strip() != "":
+                out.append(lines[i].rstrip())
+                i += 1
+            out.append("")
+        else:
+            i += 1
+    return "\n".join(out).encode("utf-8")
+
+
+def _ass_to_vtt(ass_bytes: bytes) -> bytes:
+    """Strip ASS/SSA formatting and convert to WebVTT."""
+    import re as _re
+    try:
+        text = ass_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        text = ass_bytes.decode("latin-1", errors="replace")
+
+    out = ["WEBVTT", ""]
+    cue_idx = 1
+    for line in text.splitlines():
+        if not line.startswith("Dialogue:"):
+            continue
+        parts = line.split(",", 9)
+        if len(parts) < 10:
+            continue
+        start_raw = parts[1].strip()
+        end_raw   = parts[2].strip()
+        content   = parts[9].strip()
+        # Remove ASS override tags {…} and \N line breaks
+        content = _re.sub(r"\{[^}]*\}", "", content).replace(r"\N", "\n").replace(r"\n", "\n")
+        # Convert H:MM:SS.cc → HH:MM:SS.ccc
+        def _ts(t):
+            h, m, s = t.split(":")
+            s_int, cs = s.split(".")
+            return f"{int(h):02d}:{int(m):02d}:{int(s_int):02d}.{int(cs)*10:03d}"
+        try:
+            out.append(f"{cue_idx}")
+            out.append(f"{_ts(start_raw)} --> {_ts(end_raw)}")
+            out.append(content)
+            out.append("")
+            cue_idx += 1
+        except Exception:
+            continue
+    return "\n".join(out).encode("utf-8")
+
+
+@router.get("/sub/{token}/{sub_id}/{filename}")
+@router.head("/sub/{token}/{sub_id}/{filename}")
+async def subtitle_handler(
+    token: str,
+    sub_id: str,
+    filename: str,
+    request: Request,
+    token_data: dict = Depends(verify_token),
+):
+    """Serve a subtitle file from Telegram, converting to VTT for Stremio."""
+    # Decode the subtitle's chat_id + msg_id
+    try:
+        decoded = await decode_string(sub_id)
+        chat_id = int(decoded["chat_id"])
+        msg_id  = int(decoded["msg_id"])
+    except (InvalidHash, KeyError, ValueError):
+        raise HTTPException(status_code=404, detail="Invalid subtitle ID")
+
+    # Look up the subtitle record to get the original format
+    sub_doc = await db.get_subtitle_by_id(sub_id)
+    if not sub_doc:
+        raise HTTPException(status_code=404, detail="Subtitle not found")
+
+    fmt = sub_doc.get("format", "srt").lower()
+
+    # HEAD request — just confirm it exists
+    if request.method == "HEAD":
+        return StreamingResponse(
+            iter([]),
+            media_type="text/vtt",
+            headers={"Content-Type": "text/vtt; charset=utf-8"},
+        )
+
+    # Pick a Telegram client
+    best_idx = select_best_client(target_dc=None)
+    tg_client = multi_clients[best_idx]
+
+    # Download the full subtitle document from Telegram into memory
+    try:
+        raw_bytes = b""
+        async for chunk in tg_client.stream_media(
+            {"chat_id": -abs(int(f"100{chat_id}")), "id": msg_id}
+        ):
+            raw_bytes += chunk
+    except Exception as e:
+        LOGGER.error(f"[SubtitleHandler] Failed to download subtitle {sub_id}: {e}")
+        raise HTTPException(status_code=502, detail="Could not fetch subtitle from Telegram")
+
+    # Convert to VTT
+    if fmt == "vtt":
+        vtt_bytes = raw_bytes
+    elif fmt in ("ass", "ssa"):
+        vtt_bytes = _ass_to_vtt(raw_bytes)
+    else:
+        # Default: treat as SRT
+        vtt_bytes = _srt_to_vtt(raw_bytes)
+
+    return StreamingResponse(
+        iter([vtt_bytes]),
+        media_type="text/vtt",
+        headers={
+            "Content-Type": "text/vtt; charset=utf-8",
+            "Content-Length": str(len(vtt_bytes)),
+            "Cache-Control": "public, max-age=86400",
+            "Access-Control-Allow-Origin": "*",
+        },
+    )

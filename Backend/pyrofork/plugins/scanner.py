@@ -22,6 +22,9 @@ from Backend.config import Telegram
 from Backend.helper.pyro import clean_filename, get_readable_file_size, remove_urls
 from Backend.helper.metadata import metadata
 from Backend.helper.encrypt import encode_string
+from Backend.pyrofork.plugins.reciever import (
+    _is_subtitle, _parse_sub_caption, _detect_language, LANG_NAMES
+)
 
 
 # ── Scan state (singleton — only one scan at a time) ────────────────────
@@ -178,7 +181,63 @@ async def _scan_channel(client: Client, chat_id: int):
             batch_had_content = True
             s.total_found += 1
 
-            # Only process videos / video documents
+            # ── Subtitle file? ────────────────────────────────────
+            if message.document and _is_subtitle(message.document):
+                caption    = message.caption or ""
+                fname      = message.document.file_name or "subtitle"
+                ext        = fname.rsplit(".", 1)[-1].lower() if "." in fname else "srt"
+                channel_int = int(str(chat_id).replace("-100", ""))
+                msg_id     = message.id
+                parsed = _parse_sub_caption(caption)
+
+                if parsed:
+                    # Explicit [SUB:tt... lang] caption
+                    imdb_id, lang, season, episode = parsed
+                else:
+                    # Auto-detect via metadata pipeline (same as video)
+                    try:
+                        meta = await metadata(clean_filename(fname), channel_int, msg_id)
+                    except Exception as e:
+                        LOGGER.warning(f"[Scanner] Sub metadata error msg {msg_id}: {e}")
+                        meta = None
+
+                    if not meta or not meta.get("imdb_id"):
+                        s.skipped_nonvid += 1
+                        s.processed += 1
+                        await _update_progress()
+                        continue
+
+                    imdb_id = meta["imdb_id"]
+                    lang    = _detect_language(fname)
+                    season  = meta.get("season")
+                    episode = meta.get("episode")
+
+                try:
+                    subtitle_id = await encode_string({"chat_id": channel_int, "msg_id": msg_id})
+                    ok = await db.insert_subtitle(
+                        imdb_id=imdb_id,
+                        subtitle_id=subtitle_id,
+                        language=lang,
+                        name=fname,
+                        fmt=ext,
+                        season_number=season,
+                        episode_number=episode,
+                    )
+                    if ok:
+                        s.indexed += 1
+                        ep_lbl = f" S{season:02d}E{episode:02d}" if season and episode else ""
+                        LOGGER.info(f"[Scanner] Subtitle linked: {imdb_id}{ep_lbl} [{lang}] msg {msg_id}")
+                    else:
+                        s.skipped_meta += 1
+                except Exception as e:
+                    LOGGER.error(f"[Scanner] Subtitle DB error msg {msg_id}: {e}")
+                    s.errors += 1
+
+                s.processed += 1
+                await _update_progress()
+                continue
+
+            # ── Only process videos / video documents ─────────────
             is_video = bool(message.video)
             is_video_doc = False
             if message.document and not is_video:

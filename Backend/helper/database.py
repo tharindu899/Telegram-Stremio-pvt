@@ -1703,3 +1703,118 @@ class Database:
 
         updated_doc = await collection.find_one({"tmdb_id": new_tmdb_id})
         return convert_objectid_to_str(updated_doc) if updated_doc else None
+
+    # ─────────────────────────────────────────────
+    # Subtitle Methods
+    # ─────────────────────────────────────────────
+
+    async def insert_subtitle(
+        self,
+        imdb_id: str,
+        subtitle_id: str,
+        language: str,
+        name: str,
+        fmt: str,
+        season_number: Optional[int] = None,
+        episode_number: Optional[int] = None,
+    ) -> bool:
+        """
+        Attach a subtitle entry to a movie or TV episode.
+        Returns True if the media was found and updated.
+        """
+        subtitle_doc = {
+            "id": subtitle_id,
+            "language": language,
+            "name": name,
+            "format": fmt,
+        }
+
+        for db_idx in range(self.current_db_index, 0, -1):
+            db_key = f"storage_{db_idx}"
+            db = self.dbs[db_key]
+
+            if season_number is not None and episode_number is not None:
+                # TV episode
+                tv = await db["tv"].find_one({"imdb_id": imdb_id})
+                if not tv:
+                    continue
+                updated = False
+                for season in tv.get("seasons", []):
+                    if season.get("season_number") != season_number:
+                        continue
+                    for episode in season.get("episodes", []):
+                        if episode.get("episode_number") != episode_number:
+                            continue
+                        subs = episode.setdefault("subtitles", [])
+                        # Replace if same language already exists
+                        episode["subtitles"] = [
+                            s for s in subs if s.get("language") != language
+                        ]
+                        episode["subtitles"].append(subtitle_doc)
+                        updated = True
+                if updated:
+                    await db["tv"].replace_one({"imdb_id": imdb_id}, tv)
+                    return True
+            else:
+                # Movie
+                movie = await db["movie"].find_one({"imdb_id": imdb_id})
+                if not movie:
+                    continue
+                subs = movie.setdefault("subtitles", [])
+                movie["subtitles"] = [
+                    s for s in subs if s.get("language") != language
+                ]
+                movie["subtitles"].append(subtitle_doc)
+                await db["movie"].replace_one({"imdb_id": imdb_id}, movie)
+                return True
+
+        return False
+
+    async def get_subtitles(
+        self,
+        imdb_id: str,
+        season_number: Optional[int] = None,
+        episode_number: Optional[int] = None,
+    ) -> list:
+        """Return the list of subtitle docs for a movie or TV episode."""
+        for db_idx in range(self.current_db_index, 0, -1):
+            db_key = f"storage_{db_idx}"
+            db = self.dbs[db_key]
+
+            if season_number is not None and episode_number is not None:
+                tv = await db["tv"].find_one({"imdb_id": imdb_id})
+                if not tv:
+                    continue
+                for season in tv.get("seasons", []):
+                    if season.get("season_number") != season_number:
+                        continue
+                    for episode in season.get("episodes", []):
+                        if episode.get("episode_number") != episode_number:
+                            continue
+                        return episode.get("subtitles", [])
+            else:
+                movie = await db["movie"].find_one({"imdb_id": imdb_id})
+                if movie:
+                    return movie.get("subtitles", [])
+
+        return []
+
+    async def get_subtitle_by_id(self, subtitle_id: str) -> Optional[dict]:
+        """Look up subtitle doc across all DBs by its encoded hash id."""
+        for db_idx in range(self.current_db_index, 0, -1):
+            db_key = f"storage_{db_idx}"
+            db = self.dbs[db_key]
+
+            movie = await db["movie"].find_one({"subtitles.id": subtitle_id})
+            if movie:
+                for s in movie.get("subtitles", []):
+                    if s.get("id") == subtitle_id:
+                        return s
+            tv = await db["tv"].find_one({"seasons.episodes.subtitles.id": subtitle_id})
+            if tv:
+                for season in tv.get("seasons", []):
+                    for episode in season.get("episodes", []):
+                        for s in episode.get("subtitles", []):
+                            if s.get("id") == subtitle_id:
+                                return s
+        return None
