@@ -40,7 +40,3 @@ class Telegram:
     PROXY_TYPE = getenv("ProxyType", "HTTPS")
     HTTP_PROXY_URL = getenv("HTTP_Proxy_URL", "")
     SHOW_PROXY_AND_NON_PROXY_BOTH = getenv("SHOW_ProxyAndNonProxyBoth", "false").lower() == "true"
-
-    # Subtitle support configuration
-    SUBTITLE_EXTENSIONS = getenv("SUBTITLE_EXTENSIONS", ".srt,.ass,.ssa,.sub,.vtt,.idx,.sup").split(",")
-    SUBTITLE_ENABLED = getenv("SUBTITLE_ENABLED", "true").lower() == "true"

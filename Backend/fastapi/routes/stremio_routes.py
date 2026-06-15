@@ -637,42 +637,6 @@ async def get_streams(
 
     # Deduplicate stream names — Stremio collapses streams with identical names,
     # so when two files share the same caption we append (1), (2) ... to each duplicate.
-    
-    # Get subtitles for this media
-    subtitles = await db.get_subtitles_for_media(
-        imdb_id=imdb_id,
-        media_type=media_type,
-        season=season_num,
-        episode=episode_num
-    )
-
-    # Add subtitle streams
-    language_names = {
-        'en': 'English', 'es': 'Spanish', 'fr': 'French', 'de': 'German',
-        'it': 'Italian', 'pt': 'Portuguese', 'ru': 'Russian', 'hi': 'Hindi',
-        'ta': 'Tamil', 'te': 'Telugu', 'ml': 'Malayalam', 'si': 'Sinhala'
-    }
-    
-    for subtitle in subtitles:
-        subtitle_id = subtitle.get("id")
-        if subtitle_id:
-            filename = subtitle.get("name", "")
-            language = subtitle.get("language", "unknown")
-            lang_name = language_names.get(language, language.upper())
-            size = subtitle.get("size", "")
-            
-            subtitle_url = f"{BASE_URL}/dl/{token}/{subtitle_id}/subtitle"
-            
-            streams.append({
-                "name": f"📝 {lang_name} Subtitle",
-                "title": f"📁 {filename}\n🌐 {lang_name}\n💾 {size}",
-                "url": subtitle_url,
-                "behaviorHints": {
-                    "subtitles": True,
-                    "proxy": False
-                }
-            })
-
     name_count: dict = {}
     for s in streams:
         name_count[s["name"]] = name_count.get(s["name"], 0) + 1
