@@ -1040,7 +1040,15 @@ async def search_media_for_subtitles_api(
 ):
     """Search movies/TV shows to populate the subtitle admin picker."""
     try:
-        results = await db.search_media(query=q, media_type=media_type, page=1, limit=12)
-        return {"results": results}
+        data = await db.search_documents(query=q, page=1, page_size=12)
+        all_items = data.get("results", data) if isinstance(data, dict) else data
+        # Filter by media_type if specified
+        if media_type in ("movie", "tv"):
+            all_items = [
+                m for m in all_items
+                if m.get("media_type", "") == media_type
+                or (media_type == "tv" and m.get("media_type", "") in ("tv", "series"))
+            ]
+        return {"results": all_items}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

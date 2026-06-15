@@ -109,11 +109,17 @@ def get_resolution_priority(stream_name: str) -> int:
 # --- Routes ---
 @router.get("/{token}/manifest.json")
 async def get_manifest(token: str, token_data: dict = Depends(verify_token)):
+    _sub_resource = {
+        "name": "subtitles",
+        "types": ["movie", "series"],
+        "idPrefixes": ["tt"]
+    }
+
     if Telegram.HIDE_CATALOG:
-        resources = ["stream", "subtitles"]
+        resources = ["stream", _sub_resource]
         catalogs = []
     else:
-        resources = ["catalog", "meta", "stream", "subtitles"]
+        resources = ["catalog", "meta", "stream", _sub_resource]
         catalogs = [
             {
                 "type": "movie",
