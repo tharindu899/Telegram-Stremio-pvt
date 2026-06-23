@@ -1,0 +1,647 @@
+{% extends "base.html" %}
+
+{% block title %}Media Management - Telegram Stremio{% endblock %}
+
+{% block content %}
+<div class="media-page w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+    <!-- Header -->
+    <section class="glass-panel rounded-3xl p-4 sm:p-5 lg:p-6 mb-5 sm:mb-6">
+        <div class="flex flex-col gap-5">
+            <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-text-secondary mb-3">
+                        <i class="fa-solid fa-clapperboard text-primary"></i>
+                        Library Control
+                    </div>
+                    <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-text">
+                        Media Management
+                    </h1>
+                    <p class="mt-2 text-sm sm:text-base text-text-secondary max-w-2xl">
+                        Manage your movie and TV show collections with search, filters, edit, and delete controls.
+                    </p>
+                </div>
+
+                <div class="flex flex-wrap gap-2">
+                    <a href="/media/manage?media_type=movie"
+                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition border
+                              {% if media_type == 'movie' %}
+                              bg-primary text-white border-primary shadow-lg shadow-primary/20
+                              {% else %}
+                              glass-panel text-text hover:bg-white/10 border-white/10
+                              {% endif %}">
+                        <i class="fa-solid fa-film"></i>
+                        Movies
+                    </a>
+                    <a href="/media/manage?media_type=tv"
+                       class="inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition border
+                              {% if media_type == 'tv' %}
+                              bg-primary text-white border-primary shadow-lg shadow-primary/20
+                              {% else %}
+                              glass-panel text-text hover:bg-white/10 border-white/10
+                              {% endif %}">
+                        <i class="fa-solid fa-tv"></i>
+                        TV Shows
+                    </a>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p class="text-[11px] uppercase tracking-wider text-text-secondary font-bold">Current view</p>
+                    <p class="mt-1 text-sm font-semibold text-text capitalize">{{ media_type }}</p>
+                </div>
+                <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
+                    <p class="text-[11px] uppercase tracking-wider text-text-secondary font-bold">Actions</p>
+                    <p class="mt-1 text-sm font-semibold text-text">Search, Edit, Delete, Subtitles</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Search and Filters -->
+    <section class="glass-panel rounded-3xl p-4 sm:p-6 mb-6 sm:mb-8">
+        <div class="flex flex-col lg:flex-row gap-4 lg:items-center">
+            <div class="flex-1">
+                <label for="search-input" class="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-2">
+                    Search {{ media_type|title }}
+                </label>
+                <div class="relative">
+                    <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary text-sm"></i>
+                    <input type="text"
+                           id="search-input"
+                           placeholder="Search {{ media_type }}s by title..."
+                           class="w-full pl-11 pr-4 py-3 rounded-2xl bg-background text-text placeholder:text-text-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition shadow-sm">
+                </div>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-3 lg:pt-7">
+                <button onclick="searchMedia()"
+                        class="inline-flex justify-center items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-3 rounded-2xl transition font-bold shadow-lg shadow-primary/20">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    Search
+                </button>
+                <button onclick="clearSearch()"
+                        class="inline-flex justify-center items-center gap-2 glass-panel hover:bg-white/10 text-text px-5 py-3 rounded-2xl transition font-bold border border-white/10">
+                    <i class="fa-solid fa-rotate-left"></i>
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="hidden text-center py-16">
+        <div class="inline-flex items-center justify-center w-14 h-14 rounded-full border border-white/10 glass-panel mb-4">
+            <div class="animate-spin rounded-full h-7 w-7 border-b-2 border-primary"></div>
+        </div>
+        <p class="text-text-secondary">Loading {{ media_type }}s...</p>
+    </div>
+
+    <!-- Error Display -->
+    <div id="error-display" class="hidden mb-6 sm:mb-8">
+        <div class="glass-panel rounded-3xl p-5 sm:p-6 border border-red-500/30">
+            <div class="flex items-start gap-3">
+                <div class="w-11 h-11 rounded-2xl bg-red-500/15 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
+                </div>
+                <div class="flex-1">
+                    <h3 class="text-lg font-bold text-red-300">Error Loading Media</h3>
+                    <p id="error-message" class="mt-2 text-sm text-red-200/90"></p>
+                    <button onclick="retryLoad()"
+                            class="mt-4 inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2.5 rounded-2xl transition font-bold shadow-lg shadow-primary/20">
+                        <i class="fa-solid fa-rotate-right"></i>
+                        Try Again
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Media Grid -->
+    <div id="media-grid"
+         class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <!-- Media items will be loaded here -->
+    </div>
+
+    <!-- No Results -->
+    <div id="no-results" class="hidden text-center py-16">
+        <div class="glass-panel rounded-3xl p-8 max-w-xl mx-auto">
+            <div class="mx-auto w-16 h-16 rounded-2xl bg-white/5 flex items-center justify-center mb-4 border border-white/10">
+                <i class="fa-solid fa-box-open text-3xl text-text-secondary"></i>
+            </div>
+            <h3 class="text-xl font-bold text-text mb-2">No {{ media_type }}s found</h3>
+            <p class="text-sm text-text-secondary mb-6">
+                {% if media_type == 'movie' %}
+                No movies match your search criteria.
+                {% else %}
+                No TV shows match your search criteria.
+                {% endif %}
+            </p>
+            <button onclick="clearSearch()"
+                    class="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-3 rounded-2xl transition font-bold shadow-lg shadow-primary/20">
+                <i class="fa-solid fa-clapperboard"></i>
+                Show All {{ media_type|title }}s
+            </button>
+        </div>
+    </div>
+
+    <!-- Pagination -->
+    <div id="pagination" class="hidden mt-6 sm:mt-8">
+        <div class="glass-panel rounded-3xl p-3 sm:p-4 overflow-x-auto">
+            <div class="flex justify-center items-center gap-2 min-w-max px-1" id="pagination-inner"></div>
+        </div>
+    </div>
+
+    <!-- Media Info -->
+    <div id="media-info" class="hidden mt-6">
+        <div class="glass-panel rounded-3xl p-4 sm:p-5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-sm text-text-secondary">
+                <span id="results-info"></span>
+                <span id="db-info"></span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+  .media-page .subtitle-card-meta { overflow-wrap: anywhere; }
+  @media (max-width: 420px) {
+    .media-page .group .p-4 { padding: .75rem; }
+    .media-page .group a, .media-page .group button { min-height: 2.35rem; }
+  }
+</style>
+
+<script>
+    let currentPage = 1;
+    let currentSearch = '';
+    let isLoading = false;
+    const mediaType = '{{ media_type }}';
+
+    function showLoading() {
+        isLoading = true;
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('media-grid').classList.add('hidden');
+        document.getElementById('no-results').classList.add('hidden');
+        document.getElementById('pagination').classList.add('hidden');
+        document.getElementById('media-info').classList.add('hidden');
+        document.getElementById('error-display').classList.add('hidden');
+    }
+
+    function hideLoading() {
+        isLoading = false;
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('media-grid').classList.remove('hidden');
+    }
+
+    function showError(message) {
+        document.getElementById('error-message').textContent = message;
+        document.getElementById('error-display').classList.remove('hidden');
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('media-grid').classList.add('hidden');
+        document.getElementById('no-results').classList.add('hidden');
+        document.getElementById('pagination').classList.add('hidden');
+        document.getElementById('media-info').classList.add('hidden');
+    }
+
+    async function loadMedia(page = 1, search = '') {
+        if (isLoading) return;
+
+        showLoading();
+        currentPage = page;
+        currentSearch = search;
+
+        try {
+            const url = `/api/media/list?media_type=${mediaType}&page=${page}&page_size=24&search=${encodeURIComponent(search)}`;
+            const response = await fetch(url, {
+                method: 'GET',
+                credentials: 'same-origin',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    window.location.href = '/login';
+                    return;
+                }
+                throw new Error(`Server responded with ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            hideLoading();
+
+            const grid = document.getElementById('media-grid');
+            const mediaKey = mediaType === 'movie' ? 'movies' : 'tv_shows';
+            const mediaItems = data[mediaKey] || [];
+
+            if (mediaItems.length === 0) {
+                grid.innerHTML = '';
+                document.getElementById('no-results').classList.remove('hidden');
+                document.getElementById('pagination').classList.add('hidden');
+                document.getElementById('media-info').classList.add('hidden');
+                return;
+            }
+
+            document.getElementById('no-results').classList.add('hidden');
+            grid.innerHTML = mediaItems.map(item => createMediaCard(item)).join('');
+            updatePagination(data.current_page || page, data.total_pages || 1);
+            updateMediaInfo(data);
+
+        } catch (error) {
+            console.error('Error loading media:', error);
+            hideLoading();
+            showError(`Failed to load ${mediaType}s: ${error.message}`);
+            showToast(`Failed to load ${mediaType}s.`, 'error', 'Load Error');
+        }
+    }
+
+
+    function createMediaCard(item) {
+        const title = item.title || item.name || 'Unknown Title';
+        const year = item.release_year || 'Unknown Year';
+        const poster = item.poster || 'https://via.placeholder.com/300x450/e5e7eb/9ca3af?text=No+Image';
+        const subtitleCount = Math.max(0, Number(item.subtitle_count || 0));
+        const subtitleLanguages = Array.isArray(item.subtitle_languages)
+            ? item.subtitle_languages.filter(Boolean).slice(0, 4).map(String)
+            : [];
+        const subtitleTargetSeason = item.subtitle_target_season ?? '';
+        const subtitleTargetEpisode = item.subtitle_target_episode ?? '';
+
+        const safeTitle = escapeHtml(title);
+        const safePoster = escapeHtml(poster);
+        const subtitleQuery = new URLSearchParams({
+            imdb_id: String(item.imdb_id || ''),
+            media_type: String(mediaType || 'movie'),
+            title: String(title || ''),
+            year: String(year || ''),
+            poster: String(poster || ''),
+            season: String(subtitleTargetSeason),
+            episode: String(subtitleTargetEpisode),
+        }).toString();
+        const subtitleUrl = `/subtitles/manage?${subtitleQuery}`;
+        const subtitleBadge = subtitleCount > 0 ? `
+            <a href="${subtitleUrl}" title="Edit linked subtitles"
+               class="media-subtitle-badge absolute top-3 right-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/90 hover:bg-primary text-white text-[11px] font-black backdrop-blur-md shadow-lg transition">
+                <i class="fa-solid fa-closed-captioning"></i>
+                ${subtitleCount}${subtitleLanguages.length ? ` · ${escapeHtml(subtitleLanguages.join(', '))}` : ''}
+            </a>` : '';
+        const subtitleEditor = subtitleCount > 0 && item.imdb_id ? `
+            <a href="${subtitleUrl}"
+               class="media-action media-action-subs inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-2xl bg-violet-500/10 hover:bg-violet-500 hover:text-white text-violet-300 text-xs font-bold transition border border-violet-400/30">
+                <i class="fa-solid fa-closed-captioning"></i>
+                <span class="media-action-label-full">Edit Subs</span>
+                <span class="media-action-label-short">Subs</span>
+            </a>` : '';
+        const subtitleMeta = subtitleCount > 0 ? `
+            <div class="media-subtitle-meta mt-2 inline-flex max-w-full items-center gap-1.5 px-2 py-1 rounded-xl bg-primary/10 border border-primary/20 text-[11px] font-bold text-primary">
+                <i class="fa-solid fa-closed-captioning"></i>
+                <span>${subtitleCount} subtitle${subtitleCount === 1 ? '' : 's'}${subtitleLanguages.length ? ` · ${escapeHtml(subtitleLanguages.join(', '))}` : ''}</span>
+            </div>` : '';
+
+        return `
+            <div class="media-card group overflow-hidden rounded-3xl glass-panel border border-white/10 hover:border-primary/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl">
+                <div class="media-card-poster relative overflow-hidden">
+                    <img src="${safePoster}" alt="${safeTitle}" class="w-full aspect-[2/3] object-cover transition duration-300 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/300x450/e5e7eb/9ca3af?text=No+Image'" loading="lazy">
+                    <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                    <div class="absolute top-3 left-3">
+                        <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-black/60 text-white text-[11px] font-bold backdrop-blur-md border border-white/10">
+                            <i class="fa-solid fa-calendar-days"></i> ${escapeHtml(year)}
+                        </span>
+                    </div>
+                    ${subtitleBadge}
+                </div>
+
+                <div class="media-card-body p-4">
+                    <h3 class="font-bold text-sm sm:text-base text-text line-clamp-2 min-h-[2.75rem]" title="${safeTitle}">${safeTitle}</h3>
+                    <div class="mt-2 flex items-center justify-between text-xs text-text-secondary gap-2">
+                        <span>DB #${item.db_index ?? '-'}</span>
+                        <span>${mediaType === 'movie' ? 'Movie' : 'TV Show'}</span>
+                    </div>
+                    ${subtitleMeta}
+
+                    <div class="media-actions ${subtitleEditor ? 'media-actions--with-subs' : ''} mt-4">
+                        <a href="/media/edit?tmdb_id=${encodeURIComponent(item.tmdb_id)}&db_index=${encodeURIComponent(item.db_index)}&media_type=${encodeURIComponent(mediaType)}"
+                           class="media-action media-action-edit inline-flex items-center justify-center gap-2 px-3 py-2 rounded-2xl bg-primary hover:bg-primary/90 text-white text-xs font-bold transition shadow-lg shadow-primary/20">
+                            <i class="fa-solid fa-pen-to-square"></i>
+                            <span class="media-action-label-full">Edit</span>
+                            <span class="media-action-label-short">Edit</span>
+                        </a>
+                        ${subtitleEditor}
+                        <button onclick="deleteMedia(this)"
+                                data-tmdb-id="${escapeHtml(item.tmdb_id)}"
+                                data-db-index="${escapeHtml(item.db_index ?? '')}"
+                                data-title="${safeTitle}"
+                                class="media-action media-action-delete inline-flex items-center justify-center gap-2 px-3 py-2 rounded-2xl glass-panel hover:bg-red-500/10 text-red-300 text-xs font-bold transition border border-white/10">
+                            <i class="fa-solid fa-trash"></i>
+                            <span class="media-action-label-full">Delete</span>
+                            <span class="media-action-label-short">Delete</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function updatePagination(currentPage, totalPages) {
+        const pagination = document.getElementById('pagination');
+        const paginationInner = document.getElementById('pagination-inner');
+
+        if (totalPages <= 1) {
+            pagination.classList.add('hidden');
+            paginationInner.innerHTML = '';
+            return;
+        }
+
+        pagination.classList.remove('hidden');
+        let paginationHTML = '';
+
+        if (currentPage > 1) {
+            paginationHTML += `
+                <button onclick='loadMedia(${currentPage - 1}, ${JSON.stringify(currentSearch)})'
+                        class="px-4 py-2 rounded-2xl glass-panel hover:bg-white/10 text-text text-sm font-bold transition border border-white/10">
+                    Previous
+                </button>
+            `;
+        }
+
+        const startPage = Math.max(1, currentPage - 2);
+        const endPage = Math.min(totalPages, currentPage + 2);
+
+        if (startPage > 1) {
+            paginationHTML += `
+                <button onclick='loadMedia(1, ${JSON.stringify(currentSearch)})'
+                        class="px-4 py-2 rounded-2xl glass-panel hover:bg-white/10 text-text text-sm font-bold transition border border-white/10">
+                    1
+                </button>
+            `;
+            if (startPage > 2) {
+                paginationHTML += `<span class="px-2 text-text-secondary text-sm">...</span>`;
+            }
+        }
+
+        for (let i = startPage; i <= endPage; i++) {
+            const isActive = i === currentPage;
+            paginationHTML += `
+                <button onclick='loadMedia(${i}, ${JSON.stringify(currentSearch)})'
+                        class="px-4 py-2 rounded-2xl text-sm font-bold transition border
+                               ${isActive
+                                   ? 'bg-primary text-white border-primary shadow-lg shadow-primary/20'
+                                   : 'glass-panel hover:bg-white/10 text-text border-white/10'}">
+                    ${i}
+                </button>
+            `;
+        }
+
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                paginationHTML += `<span class="px-2 text-text-secondary text-sm">...</span>`;
+            }
+            paginationHTML += `
+                <button onclick='loadMedia(${totalPages}, ${JSON.stringify(currentSearch)})'
+                        class="px-4 py-2 rounded-2xl glass-panel hover:bg-white/10 text-text text-sm font-bold transition border border-white/10">
+                    ${totalPages}
+                </button>
+            `;
+        }
+
+        if (currentPage < totalPages) {
+            paginationHTML += `
+                <button onclick='loadMedia(${currentPage + 1}, ${JSON.stringify(currentSearch)})'
+                        class="px-4 py-2 rounded-2xl glass-panel hover:bg-white/10 text-text text-sm font-bold transition border border-white/10">
+                    Next
+                </button>
+            `;
+        }
+
+        paginationInner.innerHTML = paginationHTML;
+    }
+
+    function updateMediaInfo(data) {
+        const mediaInfo = document.getElementById('media-info');
+        const resultsInfo = document.getElementById('results-info');
+        const dbInfo = document.getElementById('db-info');
+
+        const totalCount = data.total_count || 0;
+        const pageSize = 24;
+        const current = data.current_page || 1;
+        const startItem = totalCount === 0 ? 0 : ((current - 1) * pageSize) + 1;
+        const endItem = Math.min(current * pageSize, totalCount);
+
+        resultsInfo.textContent = `Showing ${startItem}-${endItem} of ${totalCount} ${mediaType}s`;
+
+        if (data.databases_checked && data.databases_checked.length > 0) {
+            dbInfo.textContent = `Databases checked: ${data.databases_checked.join(', ')}`;
+        } else {
+            dbInfo.textContent = '';
+        }
+
+        mediaInfo.classList.remove('hidden');
+    }
+
+    function searchMedia() {
+        const searchInput = document.getElementById('search-input');
+        const search = searchInput.value.trim();
+        loadMedia(1, search);
+    }
+
+    function clearSearch() {
+        document.getElementById('search-input').value = '';
+        loadMedia(1, '');
+    }
+
+    function retryLoad() {
+        loadMedia(currentPage, currentSearch);
+    }
+
+    async function deleteMedia(buttonElement) {
+    const tmdbId = buttonElement.getAttribute('data-tmdb-id');
+    const dbIndex = buttonElement.getAttribute('data-db-index');
+    const title = buttonElement.getAttribute('data-title');
+
+    if (!confirm(`Are you sure you want to delete "${title}"?\n\nThis action cannot be undone.`)) return;
+
+    try {
+        const response = await fetch(`/api/media/delete?tmdb_id=${encodeURIComponent(tmdbId)}&db_index=${encodeURIComponent(dbIndex)}&media_type=${encodeURIComponent(mediaType)}`, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            }
+        });
+
+        if (response.ok) {
+            showToast(`"${title}" deleted successfully`, 'success', 'Deleted');
+            loadMedia(currentPage, currentSearch); // Refresh grid
+        } else {
+            const error = await response.json().catch(() => ({}));
+            showToast(error.detail || `Error deleting "${title}"`, 'error', 'Delete Failed');
+        }
+    } catch (error) {
+        console.error('Error deleting media:', error);
+        showToast(`Error deleting "${title}": ${error.message}`, 'error', 'Network Error');
+    }
+}
+
+    document.addEventListener('DOMContentLoaded', () => {
+        loadMedia();
+
+        const searchInput = document.getElementById('search-input');
+
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchMedia();
+            }
+        });
+
+        let searchTimeout;
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(searchTimeout);
+            const searchValue = e.target.value.trim();
+
+            if (searchValue.length === 0) {
+                searchTimeout = setTimeout(() => {
+                    loadMedia(1, '');
+                }, 250);
+            }
+        });
+    });
+</script>
+
+<style>
+    .line-clamp-2 {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .aspect-\[2\/3\] {
+        aspect-ratio: 2 / 3;
+    }
+
+    /* Better mobile scrolling for pagination */
+    #pagination .overflow-x-auto {
+        scrollbar-width: thin;
+    }
+
+    #pagination .overflow-x-auto::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    #pagination .overflow-x-auto::-webkit-scrollbar-thumb {
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Do not allow action words such as Edit/Delete to break character-by-character. */
+    .media-page #media-grid > .glass-panel,
+    .media-page #media-grid > div {
+        min-width: 0;
+    }
+
+    .media-page .media-card h3,
+    .media-page .subtitle-card-meta,
+    .media-page .media-subtitle-meta {
+        overflow-wrap: anywhere;
+    }
+
+    .media-page .media-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: .5rem;
+    }
+
+    .media-page .media-actions--with-subs .media-action-delete {
+        grid-column: 1 / -1;
+    }
+
+    .media-page .media-action {
+        min-width: 0;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        line-height: 1.15;
+    }
+
+    .media-page .media-action i { flex: 0 0 auto; }
+    .media-page .media-action-label-short { display: none; }
+
+    @media (max-width: 640px) {
+        .media-page section {
+            border-radius: 1.35rem !important;
+        }
+
+        .media-page .flex.flex-col.sm\:flex-row,
+        .media-page .flex.flex-col.lg\:flex-row {
+            gap: 0.65rem;
+        }
+
+        .media-page .flex.flex-col.sm\:flex-row > button,
+        .media-page .flex.flex-col.sm\:flex-row > a,
+        .media-page .flex.flex-col.sm\:flex-row > div,
+        .media-page .flex.flex-col.lg\:flex-row button {
+            width: 100%;
+        }
+
+        .media-page #media-grid .media-card-body {
+            padding: 0.75rem !important;
+        }
+
+        .media-page #media-grid .rounded-3xl {
+            border-radius: 1.15rem !important;
+        }
+
+        .media-page #media-grid h3 {
+            font-size: 0.82rem;
+            min-height: 2.25rem;
+        }
+
+        .media-page #media-grid .media-actions {
+            margin-top: .75rem;
+            gap: .42rem;
+        }
+
+        .media-page #media-grid .media-action {
+            min-height: 2.55rem;
+            gap: .28rem;
+            padding: .46rem .34rem;
+            font-size: .69rem;
+            border-radius: .85rem;
+        }
+
+        .media-page #media-grid .media-action i {
+            font-size: .76rem;
+        }
+
+        .media-page #media-grid .media-action-label-full { display: none; }
+        .media-page #media-grid .media-action-label-short { display: inline; }
+
+        .media-page #media-grid .media-subtitle-meta {
+            max-width: 100%;
+            padding: .38rem .52rem;
+            font-size: .66rem;
+        }
+
+        .media-page #media-grid .media-subtitle-badge {
+            top: .45rem;
+            right: .45rem;
+            max-width: calc(100% - .9rem);
+            padding: .32rem .48rem;
+            gap: .28rem;
+            font-size: .65rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .media-page #pagination-inner button {
+            padding: 0.55rem 0.8rem !important;
+        }
+    }
+
+</style>
+{% endblock %}

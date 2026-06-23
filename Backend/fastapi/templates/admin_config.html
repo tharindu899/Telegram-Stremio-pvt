@@ -1,0 +1,385 @@
+{% extends "base.html" %}
+{% block title %}Config · Telegram Stremio{% endblock %}
+{% block content %}
+<div class="config-page max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-5">
+  <section class="page-hero glass-panel p-4 sm:p-6">
+    <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+      <div class="min-w-0">
+        <div class="eyebrow"><i class="fa-solid fa-sliders"></i> Live WebUI</div>
+        <h1 class="text-2xl sm:text-4xl font-black mt-3">Config Setup via WebUI</h1>
+        <p class="hero-copy">Fill startup secrets once in <code>config.env</code> or your host secrets. Every setting below is saved in MongoDB and takes effect instantly—no restart needed.</p>
+      </div>
+      <div class="flex gap-2 shrink-0">
+        <button id="reloadBtn" type="button" class="cfg-btn ghost refresh-spin-btn"><i class="fa-solid fa-rotate refresh-icon"></i><span>Reload</span></button>
+        <button id="saveBtn" type="button" class="cfg-btn primary"><i class="fa-solid fa-floppy-disk"></i><span>Save Changes</span></button>
+      </div>
+    </div>
+  </section>
+
+  <section class="setup-panel glass-panel p-3 sm:p-4">
+    <div class="flex flex-col xl:flex-row xl:items-start gap-4">
+      <div class="setup-copy">
+        <div class="section-kicker"><i class="fa-solid fa-key"></i> Startup only</div>
+        <h2 class="text-lg sm:text-xl font-black mt-1">Required before the first start</h2>
+        <p>These seven values connect the app to Telegram and the two MongoDB databases. They stay outside the dashboard because the server needs them before the WebUI can load.</p>
+        <pre class="env-example" aria-label="Startup config example"><span># Telegram</span>
+API_ID=""
+API_HASH=""
+BOT_TOKEN=""
+HELPER_BOT_TOKEN=""
+OWNER_ID=""
+
+<span># Database — exactly 2 comma-separated URIs</span>
+DATABASE=""
+
+<span># Server — use 7860 on Hugging Face Docker; 8000 is common on a VPS</span>
+PORT="7860"
+
+<span># Extra streaming bots are added safely below in WebUI</span>
+# No MULTI_TOKEN1… config.env entries needed</pre>
+      </div>
+      <div class="startup-grid" id="startupGrid" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="multi-bot-panel glass-panel p-3 sm:p-5" aria-labelledby="multiBotsTitle">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+      <div class="min-w-0">
+        <div class="section-kicker"><i class="fa-solid fa-network-wired"></i> Telegram streaming pool</div>
+        <h2 id="multiBotsTitle" class="font-black text-lg sm:text-xl mt-1">Multi-Bot Tokens</h2>
+        <p id="multiBotNote" class="section-copy">Loading multi-bot status…</p>
+      </div>
+      <div class="bot-status-pills" id="multiBotPills" aria-live="polite"></div>
+    </div>
+
+    <div class="multi-bot-grid mt-4">
+      <article class="bot-card bot-card-status">
+        <div class="bot-card-head">
+          <div>
+            <div class="bot-card-title"><i class="fa-solid fa-list-check"></i><span>Saved stream bots</span></div>
+            <p>Each bot must be an admin in every source channel or group. Saved values stay masked in the dashboard.</p>
+          </div>
+          <span id="savedBotCount" class="group-count">0 saved</span>
+        </div>
+        <div id="savedBotList" class="saved-bot-list" aria-live="polite"></div>
+        <p class="bot-security-note"><i class="fa-solid fa-lock"></i><span>Tokens are encrypted in MongoDB. Their original values are never returned to the browser after saving.</span></p>
+      </article>
+
+      <article class="bot-card bot-card-form">
+        <div class="bot-card-head">
+          <div>
+            <div class="bot-card-title"><i class="fa-solid fa-plus"></i><span>Add streaming bot</span></div>
+            <p>Paste one BotFather token in each field. Save starts new bots immediately—no app restart required.</p>
+          </div>
+        </div>
+        <div id="newBotFields" class="new-bot-fields"></div>
+        <div class="bot-form-actions">
+          <button id="addBotFieldBtn" type="button" class="cfg-btn ghost bot-add-btn"><i class="fa-solid fa-plus"></i><span>Add another bot</span></button>
+          <button id="saveMultiBotsBtn" type="button" class="cfg-btn primary"><i class="fa-solid fa-floppy-disk"></i><span>Save Streaming Bots</span></button>
+        </div>
+      </article>
+    </div>
+    <p class="multi-bot-help"><i class="fa-solid fa-circle-info"></i><span>Old <code>MULTI_TOKEN1</code>, <code>MULTI_TOKEN2</code> host secrets still work for compatibility. After migrating them here, remove the old host secrets so a bot is not configured twice.</span></p>
+  </section>
+
+  <section class="feature-strip" aria-label="Live configuration behavior">
+    <article class="feature-card">
+      <span class="feature-icon"><i class="fa-solid fa-bolt"></i></span>
+      <div><strong>Changes apply live</strong><p>Save once. The active server uses the new configuration immediately.</p></div>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon"><i class="fa-solid fa-gauge-high"></i></span>
+      <div><strong>Dynamic stream tuning</strong><p>Each viewer stays on one healthy bot for play, resume, and seeking. Extra bots are automatically used for other viewers.</p></div>
+    </article>
+    <article class="feature-card">
+      <span class="feature-icon"><i class="fa-solid fa-shield-halved"></i></span>
+      <div><strong>Secrets stay protected</strong><p>Startup credentials stay in host secrets; WebUI stream-bot tokens are encrypted and masked.</p></div>
+    </article>
+  </section>
+
+  <section class="glass-panel p-3 sm:p-5">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+      <div>
+        <div class="section-kicker"><i class="fa-solid fa-wand-magic-sparkles"></i> Runtime settings</div>
+        <h2 class="font-black text-lg sm:text-xl mt-1">Manage your server without editing config.env</h2>
+        <p id="runtimeNote" class="section-copy">Loading live configuration…</p>
+      </div>
+      <span id="saveStatus" class="status-chip" role="status">Loading</span>
+    </div>
+    <div id="configGroups" class="space-y-5"></div>
+  </section>
+</div>
+
+<style>
+.config-page code { padding:.12rem .42rem; border-radius:.5rem; background:color-mix(in srgb,var(--bg) 70%,transparent); border:1px solid color-mix(in srgb,var(--border) 65%,transparent); color:var(--primary); }
+.eyebrow,.section-kicker { display:inline-flex; align-items:center; gap:.45rem; font-weight:1000; text-transform:uppercase; letter-spacing:.12em; font-size:.67rem; color:var(--primary); }
+.eyebrow { padding:.38rem .62rem; border:1px solid color-mix(in srgb,var(--primary) 32%,transparent); border-radius:999px; background:color-mix(in srgb,var(--primary) 13%,transparent); }
+.hero-copy,.setup-copy>p,.section-copy { color:var(--text-sec); font-size:.86rem; line-height:1.5; margin-top:.5rem; max-width:48rem; }
+.cfg-btn { min-height:2.65rem; display:inline-flex; align-items:center; justify-content:center; gap:.55rem; border-radius:.9rem; padding:.65rem .9rem; font-weight:1000; border:1px solid color-mix(in srgb,var(--border) 65%,transparent); transition:transform .12s ease, opacity .12s ease; }
+.cfg-btn:active { transform:scale(.985); }
+.cfg-btn.primary { background:var(--primary); color:var(--bg); border-color:var(--primary); }
+.cfg-btn.ghost { background:color-mix(in srgb,var(--card) 70%,transparent); color:var(--text); }
+.refresh-spin-btn .refresh-icon { transition:transform .18s ease; }
+.refresh-spin-btn.is-loading,.cfg-btn.is-loading { pointer-events:none; opacity:.82; }
+.refresh-spin-btn.is-loading .refresh-icon { animation:refreshSpin .8s linear infinite; }
+@keyframes refreshSpin { to { transform:rotate(360deg); } }
+
+.setup-panel { overflow:hidden; }
+.setup-copy { flex:1 1 26rem; min-width:0; }
+.env-example { margin-top:.8rem; overflow:auto; max-height:16rem; padding:.85rem; border-radius:1rem; font-size:.72rem; line-height:1.48; color:var(--text); background:color-mix(in srgb,var(--bg) 66%,transparent); border:1px solid color-mix(in srgb,var(--border) 70%,transparent); }
+.env-example span { color:var(--primary); font-weight:900; }
+.startup-grid { flex:1 1 20rem; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.55rem; align-content:start; }
+.startup-card { min-height:4.7rem; padding:.75rem; border:1px solid color-mix(in srgb,var(--border) 72%,transparent); background:color-mix(in srgb,var(--card) 70%,transparent); border-radius:1rem; }
+.startup-card.good { border-color:color-mix(in srgb,#22c55e 32%,var(--border)); }
+.startup-card.bad { border-color:color-mix(in srgb,#ef4444 32%,var(--border)); }
+.startup-k { font-size:.63rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-sec); font-weight:1000; }
+.startup-v { display:flex; gap:.35rem; align-items:center; margin-top:.3rem; font-weight:1000; font-size:.78rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.startup-card.good .startup-v { color:#86efac; }.startup-card.bad .startup-v { color:#fecaca; }
+
+.feature-strip { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.65rem; }
+.feature-card { display:flex; align-items:flex-start; gap:.7rem; min-width:0; padding:.8rem; border-radius:1rem; background:color-mix(in srgb,var(--card) 62%,transparent); border:1px solid color-mix(in srgb,var(--border) 68%,transparent); }
+.feature-icon { display:inline-flex; align-items:center; justify-content:center; flex:0 0 auto; width:2.15rem; height:2.15rem; border-radius:.8rem; color:var(--primary); background:color-mix(in srgb,var(--primary) 14%,transparent); }
+.feature-card strong { font-size:.78rem; font-weight:1000; }.feature-card p { color:var(--text-sec); font-size:.7rem; line-height:1.35; margin-top:.14rem; }
+
+.status-chip { display:inline-flex; align-items:center; justify-content:center; padding:.42rem .7rem; border-radius:999px; font-size:.72rem; font-weight:1000; color:var(--text-sec); background:color-mix(in srgb,var(--bg) 55%,transparent); border:1px solid color-mix(in srgb,var(--border) 65%,transparent); white-space:nowrap; }
+.status-chip.good { color:#86efac; background:color-mix(in srgb,#22c55e 16%,transparent); border-color:color-mix(in srgb,#22c55e 35%,transparent); }.status-chip.bad { color:#fecaca; background:color-mix(in srgb,#ef4444 16%,transparent); border-color:color-mix(in srgb,#ef4444 35%,transparent); }
+.group-heading { display:flex; align-items:center; justify-content:space-between; gap:.8rem; margin:0 0 .7rem; }.group-title { display:flex; align-items:center; gap:.55rem; font-size:1rem; font-weight:1000; }.group-count { font-size:.66rem; color:var(--text-sec); padding:.25rem .5rem; border-radius:999px; border:1px solid color-mix(in srgb,var(--border) 60%,transparent); }
+.cfg-grid { display:grid; grid-template-columns:repeat(1,minmax(0,1fr)); gap:.7rem; }.cfg-card { min-width:0; padding:.85rem; border:1px solid color-mix(in srgb,var(--border) 70%,transparent); background:color-mix(in srgb,var(--card) 66%,transparent); border-radius:1rem; }.cfg-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.7rem; }.cfg-label { font-weight:1000; line-height:1.15; }.cfg-desc { color:var(--text-sec); font-size:.76rem; line-height:1.35; margin-top:.28rem; }.source-badge { display:inline-flex; align-items:center; gap:.35rem; margin-top:.55rem; padding:.28rem .52rem; border-radius:999px; font-size:.64rem; font-weight:1000; color:var(--text-sec); background:color-mix(in srgb,var(--bg) 55%,transparent); border:1px solid color-mix(in srgb,var(--border) 60%,transparent); }
+.cfg-input,.cfg-select,.cfg-textarea { width:100%; margin-top:.65rem; min-height:2.55rem; border-radius:.85rem; padding:.65rem .8rem; font-weight:800; }.cfg-textarea { min-height:5.4rem; resize:vertical; }.secret-wrap { position:relative; }.secret-wrap .cfg-input { padding-right:3.15rem; }.reveal-btn { position:absolute; right:.35rem; bottom:.35rem; width:2.05rem; height:2.05rem; border-radius:.7rem; color:var(--text-sec); background:color-mix(in srgb,var(--card) 70%,transparent); border:1px solid color-mix(in srgb,var(--border) 65%,transparent); }.reveal-btn:active { color:var(--primary); }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-top:.7rem; padding:.65rem .75rem; border-radius:.85rem; background:color-mix(in srgb,var(--bg) 46%,transparent); border:1px solid color-mix(in srgb,var(--border) 55%,transparent); }.toggle-state { font-size:.78rem; font-weight:1000; }.switch { position:relative; width:3.05rem; height:1.65rem; flex:0 0 auto; }.switch input { opacity:0; width:0; height:0; }.slider { position:absolute; cursor:pointer; inset:0; border-radius:999px; background:color-mix(in srgb,var(--border) 80%,transparent); transition:.18s; }.slider:before { position:absolute; content:""; height:1.2rem; width:1.2rem; left:.22rem; top:.22rem; border-radius:999px; background:white; transition:.18s; box-shadow:0 2px 8px rgba(0,0,0,.25); }.switch input:checked + .slider { background:var(--primary); }.switch input:checked + .slider:before { transform:translateX(1.4rem); }
+
+.multi-bot-panel { overflow:hidden; }
+.bot-status-pills { display:flex; flex-wrap:wrap; gap:.42rem; }
+.bot-status-pill { display:inline-flex; align-items:center; gap:.38rem; padding:.4rem .58rem; border-radius:999px; font-size:.68rem; font-weight:1000; color:var(--text-sec); background:color-mix(in srgb,var(--bg) 55%,transparent); border:1px solid color-mix(in srgb,var(--border) 65%,transparent); white-space:nowrap; }
+.bot-status-pill.good { color:#86efac; border-color:color-mix(in srgb,#22c55e 35%,transparent); background:color-mix(in srgb,#22c55e 12%,transparent); }
+.bot-status-pill.warn { color:#fde68a; border-color:color-mix(in srgb,#f59e0b 35%,transparent); background:color-mix(in srgb,#f59e0b 12%,transparent); }
+.multi-bot-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.8rem; }
+.bot-card { min-width:0; padding:.9rem; border:1px solid color-mix(in srgb,var(--border) 68%,transparent); background:color-mix(in srgb,var(--card) 68%,transparent); border-radius:1rem; }
+.bot-card-head { display:flex; align-items:flex-start; justify-content:space-between; gap:.7rem; }
+.bot-card-title { display:flex; align-items:center; gap:.52rem; font-weight:1000; }.bot-card-title i{color:var(--primary);}
+.bot-card-head p { color:var(--text-sec); font-size:.75rem; line-height:1.4; margin-top:.3rem; max-width:31rem; }
+.saved-bot-list { display:grid; gap:.5rem; margin-top:.75rem; }
+.saved-bot { display:flex; align-items:center; justify-content:space-between; gap:.7rem; padding:.64rem .7rem; border-radius:.85rem; background:color-mix(in srgb,var(--bg) 50%,transparent); border:1px solid color-mix(in srgb,var(--border) 56%,transparent); }
+.saved-bot-main { min-width:0; display:flex; align-items:center; gap:.55rem; }.saved-bot-main i{color:var(--primary);}.saved-bot-name{font-size:.78rem;font-weight:1000;}.saved-bot-sub{font-size:.66rem;color:var(--text-sec);margin-top:.08rem;}.saved-bot-actions{display:flex;align-items:center;gap:.38rem;flex:0 0 auto;}
+.source-tag { display:inline-flex; align-items:center; gap:.28rem; padding:.25rem .45rem; border-radius:999px; color:var(--text-sec); border:1px solid color-mix(in srgb,var(--border) 58%,transparent); font-size:.61rem; font-weight:1000; }.source-tag.live{color:#86efac;border-color:color-mix(in srgb,#22c55e 34%,transparent);}
+.bot-remove-btn,.new-bot-remove { width:2rem; height:2rem; display:inline-flex; align-items:center; justify-content:center; border-radius:.66rem; color:#fecaca; border:1px solid color-mix(in srgb,#ef4444 35%,transparent); background:color-mix(in srgb,#ef4444 10%,transparent); }.bot-remove-btn:active,.new-bot-remove:active{transform:scale(.96);}
+.bot-security-note,.multi-bot-help { display:flex; align-items:flex-start; gap:.48rem; color:var(--text-sec); font-size:.7rem; line-height:1.4; margin-top:.7rem; }.bot-security-note i,.multi-bot-help i{color:var(--primary);margin-top:.08rem;}
+.new-bot-fields { display:grid; gap:.55rem; margin-top:.75rem; }.new-bot-row{display:flex;align-items:center;gap:.45rem;}.new-bot-row .secret-wrap{flex:1 1 auto;min-width:0;}.new-bot-row .cfg-input{margin-top:0;}.new-bot-row .reveal-btn{bottom:.25rem;}.new-bot-label{display:block;font-size:.66rem;font-weight:1000;text-transform:uppercase;letter-spacing:.08em;color:var(--text-sec);margin:0 0 .32rem .05rem;}.bot-form-actions{display:flex;gap:.55rem;justify-content:flex-end;flex-wrap:wrap;margin-top:.75rem;}.bot-add-btn{color:var(--text);}
+
+.empty-config { padding:1.4rem; text-align:center; color:var(--text-sec); border:1px dashed color-mix(in srgb,var(--border) 75%,transparent); border-radius:1rem; }
+
+@media(min-width:768px){ .cfg-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media(max-width:760px){ .feature-strip,.multi-bot-grid { grid-template-columns:1fr; }.startup-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.cfg-btn span{display:none;}.cfg-btn{width:2.65rem;padding:.55rem;}.bot-form-actions{justify-content:stretch;}.bot-form-actions .cfg-btn{flex:1;width:auto;}.bot-status-pills{width:100%;}.saved-bot{align-items:flex-start;}.saved-bot-actions{padding-top:.05rem;} }
+@media(max-width:390px){ .startup-grid { grid-template-columns:1fr; }.env-example { font-size:.65rem; } }
+</style>
+
+<script>
+let configPayload = null;
+let multiBotPayload = null;
+let newBotFieldIndex = 0;
+const $ = (selector) => document.querySelector(selector);
+const statusEl = $('#saveStatus');
+
+function setButtonLoading(btnOrId, loading, label) {
+  const btn = typeof btnOrId === 'string' ? document.getElementById(btnOrId) : btnOrId;
+  if (!btn) return;
+  btn.classList.toggle('is-loading', !!loading);
+  btn.disabled = !!loading;
+  const text = btn.querySelector('span');
+  if (text && label) text.textContent = label;
+}
+function setStatus(text, kind='') { statusEl.textContent = text; statusEl.className = 'status-chip ' + kind; }
+function esc(value) { return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char])); }
+function iconFor(category) {
+  return {
+    'General':'fa-globe', 'Telegram Sources':'fa-paper-plane', 'Metadata':'fa-film', 'Library':'fa-boxes-stacked',
+    'Admin Access':'fa-user-shield', 'Subscription':'fa-crown', 'Updates':'fa-code-branch', 'Proxy':'fa-shield-halved', 'Streaming':'fa-gauge-high'
+  }[category] || 'fa-sliders';
+}
+function renderStartup(items) {
+  $('#startupGrid').innerHTML = (items || []).map(item => `
+    <article class="startup-card ${item.present ? 'good' : 'bad'}">
+      <div class="startup-k">${esc(item.key)}</div>
+      <div class="startup-v"><i class="fa-solid ${item.present ? 'fa-circle-check' : 'fa-triangle-exclamation'}"></i>${esc(item.value)}</div>
+    </article>`).join('');
+}
+function addNewBotField() {
+  const host = $('#newBotFields');
+  if (!host) return;
+  const index = ++newBotFieldIndex;
+  const row = document.createElement('div');
+  row.className = 'new-bot-row';
+  row.innerHTML = `<div class="secret-wrap"><label class="new-bot-label" for="multiBotToken${index}">Stream Bot ${index}</label><input id="multiBotToken${index}" class="cfg-input multi-bot-token" type="password" autocomplete="off" placeholder="123456789:AA…BotFatherToken"><button class="reveal-btn" type="button" data-reveal aria-label="Show or hide stream bot token"><i class="fa-solid fa-eye"></i></button></div><button type="button" class="new-bot-remove" data-remove-new-bot aria-label="Remove token field"><i class="fa-solid fa-trash"></i></button>`;
+  host.appendChild(row);
+}
+function renderMultiBots(data) {
+  multiBotPayload = data || {};
+  const runtime = multiBotPayload.runtime || {};
+  const saved = multiBotPayload.saved_bots || [];
+  const savedCount = Number(multiBotPayload.saved_count || saved.length || 0);
+  const hostCount = Number(runtime.host_secret_count || 0);
+  const liveCount = Number(runtime.extra_connected || 0);
+  $('#multiBotNote').textContent = multiBotPayload.note || 'Add extra stream bots to distribute Telegram playback traffic.';
+  $('#savedBotCount').textContent = `${savedCount} saved`;
+  $('#multiBotPills').innerHTML = [
+    `<span class="bot-status-pill good"><i class="fa-solid fa-circle-check"></i>Main bot active</span>`,
+    `<span class="bot-status-pill ${liveCount ? 'good' : ''}"><i class="fa-solid fa-tower-broadcast"></i>${liveCount} extra live</span>`,
+    hostCount ? `<span class="bot-status-pill warn"><i class="fa-solid fa-key"></i>${hostCount} host secret${hostCount === 1 ? '' : 's'}</span>` : ''
+  ].filter(Boolean).join('');
+  const list = $('#savedBotList');
+  list.innerHTML = saved.length ? saved.map((bot, index) => {
+    const active = (runtime.clients || []).some(client => client.source === 'WebUI' && Number(client.client_id) > 0);
+    return `<div class="saved-bot"><div class="saved-bot-main"><i class="fa-solid fa-robot"></i><div><div class="saved-bot-name">${esc(bot.label || `Stream Bot ${index + 1}`)}</div><div class="saved-bot-sub">Token protected · ${active ? 'active pool' : 'saved for startup'}</div></div></div><div class="saved-bot-actions"><span class="source-tag ${active ? 'live' : ''}"><i class="fa-solid ${active ? 'fa-signal' : 'fa-lock'}"></i>${active ? 'Live' : 'Saved'}</span><button class="bot-remove-btn" type="button" data-remove-saved-bot="${esc(bot.id)}" aria-label="Remove ${esc(bot.label || 'stream bot')}"><i class="fa-solid fa-trash"></i></button></div></div>`;
+  }).join('') : '<div class="empty-config">No WebUI stream bots saved yet. Add one or more BotFather tokens on the right.</div>';
+  if (!$('#newBotFields').children.length) addNewBotField();
+}
+async function loadMultiBots() {
+  const response = await fetch('/api/admin/multi-bots', { cache:'no-store' });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || 'Could not load multi-bot settings.');
+  renderMultiBots(data);
+}
+function collectNewBotTokens() {
+  return [...document.querySelectorAll('.multi-bot-token')].map(input => input.value.trim()).filter(Boolean);
+}
+async function saveMultiBots() {
+  const tokens = collectNewBotTokens();
+  if (!tokens.length) {
+    window.showToast?.('Add a token first', 'Paste at least one BotFather token before saving.', 'warning');
+    return;
+  }
+  setButtonLoading('saveMultiBotsBtn', true, 'Saving');
+  try {
+    const response = await fetch('/api/admin/multi-bots', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({tokens}) });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || 'Could not save streaming bots.');
+    $('#newBotFields').innerHTML = '';
+    newBotFieldIndex = 0;
+    renderMultiBots({ ...(multiBotPayload || {}), ...(data.summary || {}), runtime:data.runtime || {} });
+    window.showToast?.('Streaming bots saved', data.message || 'The new bot pool is active.', 'success');
+  } finally {
+    setButtonLoading('saveMultiBotsBtn', false, 'Save Streaming Bots');
+  }
+}
+async function removeSavedBot(tokenIdentifier) {
+  if (!tokenIdentifier) return;
+  if (!window.confirm('Remove this saved streaming bot? Active playback may switch to another available bot.')) return;
+  const button = document.querySelector(`[data-remove-saved-bot="${tokenIdentifier}"]`);
+  setButtonLoading(button, true);
+  try {
+    const response = await fetch(`/api/admin/multi-bots/${encodeURIComponent(tokenIdentifier)}/remove`, { method:'POST' });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || 'Could not remove streaming bot.');
+    renderMultiBots({ ...(multiBotPayload || {}), ...(data.summary || {}), runtime:data.runtime || {} });
+    window.showToast?.('Streaming bot removed', data.message || 'The bot was removed from the pool.', 'success');
+  } finally {
+    if (button) { button.classList.remove('is-loading'); button.disabled = false; }
+  }
+}
+
+function inputFor(item) {
+  const value = esc(item.value ?? '');
+  if (item.type === 'bool') {
+    const checked = item.value === true || String(item.value).toLowerCase() === 'true';
+    return `<div class="toggle-row"><span class="toggle-state">${checked ? 'Enabled' : 'Disabled'}</span><label class="switch"><input data-key="${esc(item.key)}" type="checkbox" ${checked ? 'checked' : ''}><span class="slider"></span></label></div>`;
+  }
+  if (item.type === 'choice') {
+    return `<select class="cfg-select" data-key="${esc(item.key)}">${(item.choices || []).map(choice => `<option value="${esc(choice)}" ${String(item.value) === String(choice) ? 'selected' : ''}>${esc(choice)}</option>`).join('')}</select>`;
+  }
+  if (item.type === 'list_str' || item.type === 'list_int') {
+    return `<textarea class="cfg-textarea" data-key="${esc(item.key)}" placeholder="${esc(item.placeholder || '')}">${value}</textarea>`;
+  }
+  if (item.type === 'secret') {
+    return `<div class="secret-wrap"><input class="cfg-input" data-key="${esc(item.key)}" type="password" value="${value}" placeholder="${esc(item.placeholder || '')}"><button class="reveal-btn" type="button" data-reveal aria-label="Show or hide ${esc(item.label)}"><i class="fa-solid fa-eye"></i></button></div>`;
+  }
+  return `<input class="cfg-input" data-key="${esc(item.key)}" type="text" value="${value}" placeholder="${esc(item.placeholder || '')}">`;
+}
+function renderConfig(items) {
+  const groups = {};
+  (items || []).forEach(item => { (groups[item.category] ||= []).push(item); });
+  const html = Object.entries(groups).map(([category, list]) => `
+    <section class="config-group">
+      <div class="group-heading"><div class="group-title"><i class="fa-solid ${iconFor(category)}" style="color:var(--primary)"></i><span>${esc(category)}</span></div><span class="group-count">${list.length} setting${list.length === 1 ? '' : 's'}</span></div>
+      <div class="cfg-grid">${list.map(item => `
+        <article class="cfg-card">
+          <div class="cfg-head"><div><div class="cfg-label">${esc(item.label)}</div><div class="cfg-desc">${esc(item.description)}</div></div></div>
+          ${inputFor(item)}
+          <span class="source-badge"><i class="fa-solid fa-database"></i>${esc(item.source)}</span>
+        </article>`).join('')}</div>
+    </section>`).join('');
+  $('#configGroups').innerHTML = html || '<div class="empty-config">No runtime configuration fields are available.</div>';
+}
+async function loadConfig() {
+  setButtonLoading('reloadBtn', true, 'Loading');
+  setStatus('Loading');
+  try {
+    const response = await fetch('/api/admin/config', { cache:'no-store' });
+    if (!response.ok) throw new Error(await response.text());
+    configPayload = await response.json();
+    renderStartup(configPayload.startup_critical);
+    renderConfig(configPayload.editable);
+    $('#runtimeNote').textContent = `${configPayload.note || ''} ${configPayload.dynamic_streaming || ''}`.trim();
+    await loadMultiBots();
+    setStatus('Ready', 'good');
+  } finally {
+    setButtonLoading('reloadBtn', false, 'Reload');
+  }
+}
+function collectValues() {
+  const values = {};
+  document.querySelectorAll('[data-key]').forEach(element => {
+    values[element.dataset.key] = element.type === 'checkbox' ? element.checked : element.value;
+  });
+  return values;
+}
+async function saveConfig() {
+  setButtonLoading('saveBtn', true, 'Saving');
+  setStatus('Saving');
+  try {
+    const response = await fetch('/api/admin/config', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ values:collectValues() })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.detail || 'Save failed');
+    configPayload = data.config;
+    renderStartup(configPayload.startup_critical);
+    renderConfig(configPayload.editable);
+    $('#runtimeNote').textContent = `${configPayload.note || ''} ${configPayload.dynamic_streaming || ''}`.trim();
+    setStatus('Saved live', 'good');
+    window.showToast?.('Configuration saved', data.message || 'Runtime settings are active now.', 'success');
+  } finally {
+    setButtonLoading('saveBtn', false, 'Save Changes');
+  }
+}
+document.addEventListener('click', event => {
+  const addButton = event.target.closest('#addBotFieldBtn');
+  if (addButton) { addNewBotField(); return; }
+  const removeNew = event.target.closest('[data-remove-new-bot]');
+  if (removeNew) {
+    const rows = document.querySelectorAll('.new-bot-row');
+    if (rows.length > 1) removeNew.closest('.new-bot-row')?.remove();
+    else { const input = removeNew.closest('.new-bot-row')?.querySelector('.multi-bot-token'); if (input) input.value = ''; }
+    return;
+  }
+  const removeSaved = event.target.closest('[data-remove-saved-bot]');
+  if (removeSaved) { removeSavedBot(removeSaved.dataset.removeSavedBot).catch(error => window.showToast?.('Remove failed', error.message, 'error')); return; }
+  const button = event.target.closest('[data-reveal]');
+  if (!button) return;
+  const input = button.parentElement.querySelector('input');
+  if (!input) return;
+  const show = input.type === 'password';
+  input.type = show ? 'text' : 'password';
+  button.querySelector('i').className = `fa-solid ${show ? 'fa-eye-slash' : 'fa-eye'}`;
+});
+document.addEventListener('change', event => {
+  if (event.target.matches('.switch input[type="checkbox"]')) {
+    const state = event.target.closest('.toggle-row').querySelector('.toggle-state');
+    if (state) state.textContent = event.target.checked ? 'Enabled' : 'Disabled';
+  }
+});
+$('#reloadBtn').addEventListener('click', () => loadConfig().catch(error => { setStatus('Load error', 'bad'); window.showToast?.('Load failed', error.message, 'error'); }));
+$('#saveBtn').addEventListener('click', () => saveConfig().catch(error => { setStatus('Save error', 'bad'); window.showToast?.('Save failed', error.message, 'error'); }));
+$('#saveMultiBotsBtn').addEventListener('click', () => saveMultiBots().catch(error => window.showToast?.('Save failed', error.message, 'error')));
+loadConfig().catch(error => { setStatus('Load error', 'bad'); console.error(error); });
+</script>
+{% endblock %}

@@ -1,0 +1,488 @@
+{% extends "base.html" %}
+{% block title %}Admin Tools - Telegram Stremio{% endblock %}
+
+{% block content %}
+<div class="tools-page compact-tools max-w-7xl mx-auto px-3 sm:px-5 lg:px-6 py-3 md:py-6 space-y-4">
+  <section class="page-hero glass-panel p-4 md:p-5 overflow-hidden relative">
+    <div class="absolute inset-0 opacity-30 pointer-events-none" style="background: radial-gradient(circle at 15% 20%, color-mix(in srgb, var(--primary) 22%, transparent), transparent 38%);"></div>
+    <div class="relative flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <div>
+        <span class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-black tracking-[.22em] uppercase" style="background: color-mix(in srgb, var(--primary) 16%, transparent); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);">
+          <i class="fa-solid fa-screwdriver-wrench"></i> Control Center
+        </span>
+        <h1 class="mt-3 text-2xl md:text-4xl font-black tracking-tight">Admin Tools</h1>
+        <p class="mt-2 max-w-2xl tool-desc hero-desc" style="color: var(--text-sec);">Scan, clean, cache, analytics and speed.</p>
+      </div>
+      <div class="flex flex-col sm:flex-row gap-3 sm:items-center">
+        <div id="autoRefreshBadge" class="auto-badge"><span class="pulse-dot"></span> Auto refresh on</div>
+        <button id="refreshNowBtn" onclick="manualRefresh()" class="btn-primary inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl font-black refresh-spin-btn">
+          <i class="fa-solid fa-rotate refresh-icon"></i> <span>Refresh Now</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-3 gap-2 md:gap-3" id="quickStats">
+    <div class="glass-panel p-3 md:p-4 rounded-xl"><p class="metric-label">Scan</p><p id="scanStatus" class="metric-value">—</p></div>
+    <div class="glass-panel p-3 md:p-4 rounded-xl"><p class="metric-label">Deadcheck</p><p id="deadStatus" class="metric-value">—</p></div>
+    <div class="glass-panel p-3 md:p-4 rounded-xl"><p class="metric-label">Dedupe</p><p id="dedupeStatus" class="metric-value">—</p></div>
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="tool-card glass-panel p-4 md:p-5 rounded-xl space-y-3">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <h2 class="tool-title"><i class="fa-solid fa-satellite-dish"></i> Scanner</h2>
+          <p class="tool-desc">Scan all sources or one group ID.</p>
+        </div>
+      </div>
+      <input id="scanTarget" class="glass-input w-full px-4 py-3" placeholder="Optional: -1003586810234">
+      <div class="tool-grid scanner-actions grid grid-cols-3 gap-2">
+        <button onclick="startScan('scan')" class="btn-action"><i class="fa-solid fa-play"></i><span>Scan</span></button>
+        <button onclick="startScan('rescan')" class="btn-action danger-soft"><i class="fa-solid fa-arrows-rotate"></i><span>Rescan</span></button>
+        <button onclick="cancelScan()" class="btn-action muted"><i class="fa-solid fa-ban"></i><span>Cancel</span></button>
+      </div>
+      <div class="status-box">
+        <div class="flex items-center justify-between text-sm"><span>Progress</span><b id="scanProgressText">Idle</b></div>
+        <div class="progress-track"><div id="scanProgressBar" class="progress-bar" style="width:0%"></div></div>
+        <div id="scanDetails" class="pretty-details"><div class="empty-state">No scan running.</div></div>
+      </div>
+    </div>
+
+    <div class="tool-card glass-panel p-4 md:p-5 rounded-xl space-y-3">
+      <h2 class="tool-title"><i class="fa-solid fa-heart-pulse"></i> Health Tools</h2>
+      <p class="tool-desc">Deadcheck, dedupe, cache and catalogs.</p>
+      <div class="tool-grid action-actions grid grid-cols-2 sm:grid-cols-3 gap-2">
+        <button onclick="startDeadcheck()" class="btn-action"><i class="fa-solid fa-link"></i><span>Dead</span></button>
+        <button onclick="dedupe(false)" class="btn-action"><i class="fa-solid fa-magnifying-glass"></i><span>Check</span></button>
+        <button onclick="dedupe(true)" class="btn-action danger-soft"><i class="fa-solid fa-broom"></i><span>Clean</span></button>
+        <button onclick="clearCacheAll()" class="btn-action muted"><i class="fa-solid fa-trash-can"></i><span>Cache</span></button>
+        <button onclick="syncCatalogs(false)" class="btn-action"><i class="fa-solid fa-layer-group"></i><span>Sync</span></button>
+        <button onclick="syncCatalogs(true)" class="btn-action danger-soft"><i class="fa-solid fa-database"></i><span>Rebuild</span></button>
+      </div>
+      <div id="toolResult" class="result-panel"><div class="empty-state">Ready.</div></div>
+    </div>
+  </section>
+
+
+
+  <section class="grid grid-cols-1 xl:grid-cols-3 gap-4" id="featurePackPanel">
+    <div class="glass-panel p-4 md:p-5 rounded-xl xl:col-span-2">
+      <div class="flex items-center justify-between gap-3 mb-4">
+        <div>
+          <h2 class="tool-title"><i class="fa-solid fa-chart-line"></i> Library Analytics</h2>
+          <p class="tool-desc">Storage usage, top watched titles, token traffic, and topic/source counts.</p>
+        </div>
+        <button onclick="loadFeaturePack()" class="btn-action small"><i class="fa-solid fa-chart-simple"></i> Load</button>
+      </div>
+      <div id="analyticsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4"></div>
+      <div class="mb-4">
+        <h3 class="font-black mb-2">Storage DB Usage Chart</h3>
+        <div id="storageChart" class="storage-chart mini-list">Loading…</div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div><h3 class="font-black mb-2">Top Watched</h3><div id="topWatched" class="mini-list">Loading…</div></div>
+        <div><h3 class="font-black mb-2">Source / Topic Counts</h3><div id="topicStats" class="mini-list">Loading…</div></div>
+      </div>
+    </div>
+    <div class="glass-panel p-4 md:p-5 rounded-xl">
+      <h2 class="tool-title"><i class="fa-solid fa-key"></i> Token Traffic</h2>
+      <p class="tool-desc">View token traffic and reset quota counters.</p>
+      <div id="tokenUsage" class="mini-list mt-4">Loading…</div>
+    </div>
+  </section>
+
+
+  <section class="glass-panel p-4 md:p-5 rounded-xl">
+    <div class="flex items-center justify-between gap-3 mb-4">
+      <div>
+        <h2 class="tool-title"><i class="fa-solid fa-gauge-high"></i> Bot Speed</h2>
+        <p class="tool-desc">Recent range requests are counted so split ZIP/video playback does not show fake zero.</p>
+      </div>
+      <button onclick="loadSpeed()" class="btn-action small"><i class="fa-solid fa-bolt"></i> Check</button>
+    </div>
+    <div id="botGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+  </section>
+</div>
+
+<style>
+.tools-page .btn-primary, .btn-primary { background: var(--primary); color: var(--bg); box-shadow: 0 10px 28px color-mix(in srgb, var(--primary) 24%, transparent); }
+.metric-label { color: var(--text-sec); text-transform: uppercase; letter-spacing: .13em; font-weight: 900; font-size: .75rem; }
+.metric-value { margin-top: .5rem; font-weight: 1000; font-size: 1.6rem; color: var(--primary); }
+.tool-title { display:flex; align-items:center; gap:.65rem; font-weight: 1000; font-size: 1.45rem; }
+.tool-title i { color: var(--primary); }
+.tool-desc { color: var(--text-sec); margin-top: .35rem; font-size: .95rem; line-height: 1.55; }
+.btn-action { min-height: 3rem; padding: .75rem 1rem; border-radius: 1rem; font-weight: 1000; background: var(--primary); color: var(--bg); display: inline-flex; align-items:center; justify-content:center; gap:.55rem; box-shadow: 0 8px 22px color-mix(in srgb, var(--primary) 20%, transparent); transition: transform .12s ease, opacity .12s ease; }
+.btn-action:active { transform: scale(.985); }
+.btn-action.muted { background: color-mix(in srgb, var(--card) 80%, var(--bg)); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+.btn-action.danger-soft { background: color-mix(in srgb, #ef4444 22%, var(--card)); color: #fecaca; border: 1px solid color-mix(in srgb, #ef4444 38%, var(--border)); box-shadow: none; }
+.btn-action.small { min-height: 2.45rem; padding: .55rem .8rem; font-size: .85rem; }
+.status-box { background: color-mix(in srgb, var(--bg) 62%, transparent); border: 1px solid color-mix(in srgb, var(--border) 70%, transparent); border-radius: 1.25rem; padding: 1rem; }
+.progress-track { height: .7rem; margin: .8rem 0; border-radius: 999px; background: color-mix(in srgb, var(--bg) 72%, white 4%); overflow: hidden; border: 1px solid color-mix(in srgb, var(--border) 65%, transparent); }
+.progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary), var(--accent)); border-radius: 999px; transition: width .25s ease; }
+.mini-log { width:100%; overflow:auto; white-space:pre-wrap; min-height: 5.5rem; max-height: 18rem; padding: .9rem; border-radius: 1rem; background: color-mix(in srgb, var(--bg) 76%, black 10%); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); color: var(--text-sec); font-size: .78rem; line-height: 1.45; }
+.bot-card { background: color-mix(in srgb, var(--card) 72%, transparent); border: 1px solid color-mix(in srgb, var(--border) 70%, transparent); border-radius: 1.25rem; padding: 1rem; }
+.bot-health { display:inline-flex; padding:.35rem .7rem; border-radius:.85rem; font-size:.75rem; font-weight:1000; text-transform:uppercase; background: color-mix(in srgb, #22c55e 18%, transparent); color:#86efac; }
+.bot-health.degraded { background: color-mix(in srgb, #f59e0b 18%, transparent); color:#fde68a; }
+.bot-health.failing { background: color-mix(in srgb, #ef4444 20%, transparent); color:#fecaca; }
+
+.mini-list { display:flex; flex-direction:column; gap:.6rem; max-height:20rem; overflow:auto; }
+.mini-row { padding:.75rem .85rem; border-radius:1rem; border:1px solid color-mix(in srgb, var(--border) 60%, transparent); background:color-mix(in srgb, var(--bg) 45%, transparent); }
+.mini-row b { color:var(--text); }
+.storage-chart { gap: .7rem; }
+.storage-bar-row { padding: .85rem; border-radius: 1rem; border: 1px solid color-mix(in srgb, var(--border) 60%, transparent); background: color-mix(in srgb, var(--bg) 45%, transparent); }
+.storage-bar-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: .55rem; }
+.storage-bar-title { font-weight: 900; color: var(--text); }
+.storage-bar-meta { color: var(--text-sec); font-size: .78rem; text-align: right; }
+.storage-bar-wrap { height: .72rem; border-radius: 999px; overflow: hidden; background: color-mix(in srgb, var(--bg) 72%, white 4%); border: 1px solid color-mix(in srgb, var(--border) 55%, transparent); }
+.storage-bar { height: 100%; width: 0%; border-radius: 999px; background: linear-gradient(90deg, var(--primary), var(--accent)); transition: width .25s ease; }
+
+
+.pretty-details, .result-panel { display: grid; gap: .75rem; min-height: 5.5rem; }
+.detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .65rem; }
+@media (min-width: 640px) { .detail-grid.three { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+.detail-item { padding: .75rem .85rem; border-radius: 1rem; border: 1px solid color-mix(in srgb, var(--border) 58%, transparent); background: color-mix(in srgb, var(--bg) 48%, transparent); }
+.detail-label { display:block; color: var(--text-sec); text-transform: uppercase; letter-spacing: .11em; font-weight: 900; font-size: .68rem; }
+.detail-value { display:block; margin-top:.25rem; color: var(--text); font-weight: 1000; font-size: 1rem; word-break: break-word; }
+.status-pill { display:inline-flex; align-items:center; gap:.45rem; border-radius:999px; padding:.45rem .75rem; font-size:.76rem; font-weight:1000; text-transform:uppercase; border:1px solid color-mix(in srgb, var(--border) 55%, transparent); background:color-mix(in srgb, var(--card) 72%, transparent); color:var(--text-sec); }
+.status-pill.running { color:#67e8f9; background:color-mix(in srgb, var(--primary) 16%, transparent); border-color:color-mix(in srgb, var(--primary) 35%, transparent); }
+.status-pill.complete, .status-pill.success { color:#86efac; background:color-mix(in srgb, #22c55e 18%, transparent); border-color:color-mix(in srgb, #22c55e 36%, transparent); }
+.status-pill.error, .status-pill.failed { color:#fecaca; background:color-mix(in srgb, #ef4444 18%, transparent); border-color:color-mix(in srgb, #ef4444 36%, transparent); }
+.status-pill.idle { color:var(--text-sec); }
+.pretty-message { padding:.9rem 1rem; border-radius:1rem; border:1px solid color-mix(in srgb, var(--border) 58%, transparent); background:color-mix(in srgb, var(--bg) 48%, transparent); color:var(--text-sec); line-height:1.55; }
+.pretty-message.good { color:#bbf7d0; background:color-mix(in srgb, #22c55e 12%, transparent); border-color:color-mix(in srgb, #22c55e 32%, transparent); }
+.pretty-message.warn { color:#fde68a; background:color-mix(in srgb, #f59e0b 12%, transparent); border-color:color-mix(in srgb, #f59e0b 32%, transparent); }
+.pretty-message.bad { color:#fecaca; background:color-mix(in srgb, #ef4444 13%, transparent); border-color:color-mix(in srgb, #ef4444 32%, transparent); }
+.empty-state { padding: 1rem; border-radius: 1rem; color: var(--text-sec); border: 1px dashed color-mix(in srgb, var(--border) 60%, transparent); background: color-mix(in srgb, var(--bg) 40%, transparent); }
+.auto-badge { display:inline-flex; align-items:center; justify-content:center; gap:.55rem; padding:.75rem 1rem; border-radius:999px; color:#86efac; background:color-mix(in srgb, #22c55e 14%, transparent); border:1px solid color-mix(in srgb, #22c55e 32%, transparent); font-weight:1000; font-size:.82rem; white-space:nowrap; }
+.pulse-dot { width:.58rem; height:.58rem; border-radius:999px; background:#22c55e; box-shadow:0 0 0 0 rgba(34,197,94,.55); animation:pulseDot 1.7s infinite; }
+@keyframes pulseDot { 70% { box-shadow:0 0 0 .6rem rgba(34,197,94,0); } 100% { box-shadow:0 0 0 0 rgba(34,197,94,0); } }
+.refresh-spin-btn .refresh-icon { transition: transform .18s ease; }
+.refresh-spin-btn.is-loading { pointer-events: none; opacity: .82; }
+.refresh-spin-btn.is-loading .refresh-icon { animation: refreshSpin .8s linear infinite; }
+@keyframes refreshSpin { to { transform: rotate(360deg); } }
+
+.result-actions { display:flex; flex-wrap:wrap; gap:.55rem; margin-top:.2rem; }
+.result-mini { font-size:.78rem; color:var(--text-sec); }
+
+
+
+/* Compact 30s refresh layout */
+.compact-tools { font-size: .95rem; }
+.compact-tools .page-hero { border-radius: 1.05rem; }
+.compact-tools .glass-panel, .compact-tools .tool-card { border-radius: 1rem !important; }
+.compact-tools .metric-label { font-size: .64rem; letter-spacing: .1em; }
+.compact-tools .metric-value { margin-top: .25rem; font-size: 1.18rem; line-height: 1.1; }
+.compact-tools .tool-title { font-size: 1.12rem; gap: .5rem; }
+.compact-tools .tool-desc { font-size: .82rem; line-height: 1.35; margin-top: .2rem; }
+.compact-tools .btn-action { min-height: 2.55rem; padding: .58rem .75rem; border-radius: .78rem; font-size: .86rem; }
+.compact-tools .btn-action.small { min-height: 2.25rem; padding: .45rem .65rem; }
+.compact-tools .btn-primary { padding: .65rem .9rem; border-radius: .85rem; }
+.compact-tools .glass-input { padding: .75rem .9rem; border-radius: .8rem; }
+.compact-tools .status-box { border-radius: .95rem; padding: .75rem; }
+.compact-tools .progress-track { height: .48rem; margin: .55rem 0; }
+.compact-tools .pretty-details, .compact-tools .result-panel { gap: .5rem; min-height: 3.5rem; }
+.compact-tools .detail-grid { gap: .45rem; }
+.compact-tools .detail-item { padding: .55rem .65rem; border-radius: .75rem; }
+.compact-tools .detail-label { font-size: .6rem; letter-spacing: .08em; }
+.compact-tools .detail-value { font-size: .86rem; margin-top: .15rem; }
+.compact-tools .pretty-message, .compact-tools .empty-state { padding: .65rem .75rem; border-radius: .78rem; line-height: 1.35; }
+.compact-tools .mini-list { gap: .45rem; max-height: 16rem; }
+.compact-tools .mini-row { padding: .58rem .7rem; border-radius: .78rem; }
+.compact-tools .bot-card { padding: .75rem; border-radius: .9rem; }
+.compact-tools .bot-health { padding: .28rem .55rem; border-radius: .65rem; font-size: .65rem; }
+.compact-tools .storage-bar-row { padding: .62rem .7rem; border-radius: .82rem; }
+.compact-tools .storage-bar-head { margin-bottom: .4rem; }
+.compact-tools .storage-bar-wrap { height: .48rem; }
+.compact-tools .auto-badge { padding: .48rem .7rem; border-radius: .75rem; font-size: .72rem; }
+.compact-tools .pulse-dot { width:.45rem; height:.45rem; }
+@media (max-width: 767px) {
+  .compact-tools { padding-top: .35rem !important; padding-left: .75rem !important; padding-right: .75rem !important; gap: .85rem; }
+  .compact-tools .page-hero .inline-flex.tracking-\[\.22em\] { padding: .45rem .65rem; font-size: .58rem; letter-spacing: .14em; }
+  .compact-tools h1 { font-size: 1.55rem !important; margin-top: .65rem !important; }
+  .compact-tools .hero-desc { display: none; }
+  .compact-tools .page-hero .btn-primary { width: 100%; min-height: 2.65rem; }
+  .compact-tools #quickStats .glass-panel { padding: .75rem .55rem !important; text-align: center; }
+  .compact-tools #quickStats .metric-label { font-size: .55rem; }
+  .compact-tools #quickStats .metric-value { font-size: 1rem; }
+  .compact-tools .tool-title { font-size: 1.02rem; }
+  .compact-tools .tool-desc { font-size: .78rem; }
+  .compact-tools .btn-action { min-height: 2.6rem; }
+  .compact-tools .detail-grid.three { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .compact-tools #analyticsGrid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .compact-tools #analyticsGrid .mini-row { padding: .55rem .45rem; text-align:center; }
+  .compact-tools #analyticsGrid .text-xl { font-size: 1rem; }
+}
+
+@media (max-width: 767px) { .tools-page { padding-top: .5rem; } .tool-title { font-size: 1.22rem; } }
+
+/* Keep scanner result cards legible on narrow Android screens. */
+.compact-tools #scanDetails .detail-item { min-width: 0; }
+.compact-tools #scanDetails .detail-value { overflow-wrap: anywhere; word-break: break-word; line-height: 1.14; }
+.compact-tools #scanDetails .scan-progress-message,
+.compact-tools #scanDetails .scan-summary-line { font-size: .78rem; line-height: 1.3; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .compact-tools #scanDetails .detail-grid { gap: .4rem; }
+  .compact-tools #scanDetails .detail-item { padding: .48rem .52rem; }
+  .compact-tools #scanDetails .detail-label { font-size: .54rem; letter-spacing: .065em; }
+  .compact-tools #scanDetails .detail-value { font-size: .76rem; }
+  .compact-tools #scanDetails .scan-progress-message,
+  .compact-tools #scanDetails .scan-summary-line { padding: .58rem .65rem; font-size: .72rem; }
+}
+/* Compact mobile action grids */
+.tool-grid .btn-action { flex-direction: column; gap: .28rem; min-height: 3.05rem; padding: .55rem .35rem; line-height: 1.05; }
+.tool-grid .btn-action i { font-size: 1rem; }
+.tool-grid .btn-action span { font-size: .74rem; white-space: nowrap; }
+@media (min-width: 640px) {
+  .tool-grid .btn-action { flex-direction: row; gap: .45rem; min-height: 2.55rem; padding: .58rem .7rem; }
+  .tool-grid .btn-action span { font-size: .84rem; }
+}
+@media (max-width: 380px) {
+  .tool-grid .btn-action span { font-size: .68rem; }
+  .tool-grid .btn-action i { font-size: .92rem; }
+}
+
+</style>
+
+<script>
+let pollTimer = null;
+let lastAnalyticsLoad = 0;
+const IDLE_REFRESH_MS = 30000;
+const ACTIVE_REFRESH_MS = 30000;
+const SPEED_REFRESH_MS = 30000;
+let lastSpeedAt = 0;
+
+
+function setButtonLoading(btnOrId, loading, label){
+  const btn = typeof btnOrId === 'string' ? document.getElementById(btnOrId) : btnOrId;
+  if (!btn) return;
+  btn.classList.toggle('is-loading', !!loading);
+  btn.disabled = !!loading;
+  if (label) { const span = btn.querySelector('span'); if (span) span.textContent = label; }
+}
+
+function escapeHtml(v){ return String(v ?? '').replace(/[&<>\"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;','"':'&quot;'}[m] || m)); }
+function niceKey(key){ return String(key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+function formatBool(v){ return v ? 'Yes' : 'No'; }
+function formatValue(v){
+  if (v === null || v === undefined || v === '') return '—';
+  if (typeof v === 'boolean') return formatBool(v);
+  if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 100) / 100);
+  if (Array.isArray(v)) return v.length ? `${v.length} items` : '0';
+  if (typeof v === 'object') return 'Details';
+  return String(v);
+}
+function formatBytesShort(bytes){
+  bytes = Number(bytes || 0);
+  if (!bytes) return '0 B';
+  const units = ['B','KB','MB','GB','TB'];
+  let i = 0;
+  while (bytes >= 1024 && i < units.length - 1) { bytes /= 1024; i++; }
+  return `${bytes.toFixed(bytes >= 10 || i === 0 ? 0 : 1)} ${units[i]}`;
+}
+async function api(url, opts={}){
+  const res = await fetch(url, {headers:{'Content-Type':'application/json'}, ...opts});
+  const text = await res.text();
+  let data; try { data = JSON.parse(text); } catch { data = {message:text}; }
+  if(!res.ok) throw new Error(data.detail || data.message || text || res.statusText);
+  return data;
+}
+function pill(status){
+  const st = String(status || 'idle').toLowerCase();
+  const icon = st === 'running' ? 'fa-spinner fa-spin' : (st === 'complete' || st === 'success' ? 'fa-check' : (st === 'error' || st === 'failed' ? 'fa-triangle-exclamation' : 'fa-circle'));
+  return `<span class="status-pill ${escapeHtml(st)}"><i class="fa-solid ${icon}"></i>${escapeHtml(st.toUpperCase())}</span>`;
+}
+function statusText(job){ if(!job) return '—'; return job.running ? 'RUNNING' : (job.status || 'idle').toUpperCase(); }
+function anyJobRunning(jobs){ return !!(jobs?.scan?.running || jobs?.deadcheck?.running || jobs?.dedupe?.running); }
+function updateStatusCard(id, job){
+  const el = document.getElementById(id);
+  if (!el) return;
+  const status = job?.running ? 'RUNNING' : (job?.status || 'idle').toUpperCase();
+  el.innerHTML = `${status}`;
+  el.className = 'metric-value';
+  if (status === 'RUNNING') el.style.color = 'var(--primary)';
+  else if (status === 'COMPLETE' || status === 'SUCCESS') el.style.color = '#86efac';
+  else if (status === 'ERROR' || status === 'FAILED') el.style.color = '#fca5a5';
+  else el.style.color = 'var(--primary)';
+}
+function renderResultPanel(target, obj, fallbackTitle='Result'){
+  const el = typeof target === 'string' ? document.getElementById(target) : target;
+  if (!el) return;
+  if (typeof obj === 'string') {
+    el.innerHTML = `<div class="pretty-message">${escapeHtml(obj)}</div>`;
+    return;
+  }
+  const status = obj?.status || obj?.mode || 'success';
+  const msg = obj?.message || obj?.detail || fallbackTitle;
+  const cls = String(status).includes('error') || String(status).includes('failed') ? 'bad' : (String(status).includes('started') ? 'warn' : 'good');
+  const ignored = new Set(['status','message','detail','raw']);
+  const cards = [];
+  for (const [k,v] of Object.entries(obj || {})) {
+    if (ignored.has(k)) continue;
+    if (typeof v === 'object' && v !== null) {
+      if (Array.isArray(v)) cards.push([niceKey(k), `${v.length} items`]);
+      else {
+        const keys = Object.keys(v).slice(0,4);
+        const val = keys.length ? keys.map(x => `${niceKey(x)}: ${formatValue(v[x])}`).join(' · ') : '—';
+        cards.push([niceKey(k), val]);
+      }
+    } else cards.push([niceKey(k), formatValue(v)]);
+  }
+  el.innerHTML = `
+    <div class="pretty-message ${cls}">${pill(status)}<div class="mt-2">${escapeHtml(msg)}</div></div>
+    ${cards.length ? `<div class="detail-grid three">${cards.slice(0,9).map(([a,b]) => `<div class="detail-item"><span class="detail-label">${escapeHtml(a)}</span><span class="detail-value">${escapeHtml(b)}</span></div>`).join('')}</div>` : ''}
+  `;
+}
+function setResult(obj){ renderResultPanel('toolResult', obj, 'Done'); }
+function renderScanDetails(sp, job){
+  const el = document.getElementById('scanDetails');
+  const running = !!sp.running || !!job?.running;
+  const result = job?.result || {};
+  const asNum = (value) => Number(value || 0);
+  const pick = (key) => (sp?.[key] !== undefined && sp?.[key] !== null) ? asNum(sp[key]) : asNum(result?.[key]);
+  const videos = pick('indexed_videos');
+  const splitVideos = pick('indexed_split_videos');
+  const splitZips = pick('indexed_split_zips');
+  const subtitles = pick('indexed_subtitles');
+  const errs = pick('errors');
+  const status = running ? 'running' : (job?.status || 'idle');
+  const msg = job?.message || (running ? 'Scanning media files…' : 'No scan running.');
+  const channel = sp.channel_name || sp.channel_id || result?.channel || '—';
+  const summaryCards = [
+    ['Status', pill(status)],
+    ['Channel', channel],
+    ['Video', videos],
+    ['Split', splitVideos],
+    ['ZIP', splitZips],
+    ['Subtitles', subtitles],
+  ];
+  if (errs > 0) summaryCards.push(['Errors', errs]);
+  let resultHtml = '';
+  if (job?.result && !running) {
+    const parts = [`Video ${videos}`, `Split ${splitVideos}`, `ZIP ${splitZips}`, `Subs ${subtitles}`];
+    if (errs > 0) parts.push(`Errors ${errs}`);
+    resultHtml = `<div class="pretty-message good scan-summary-line"><b>${escapeHtml(result.cancelled ? 'Scan cancelled' : 'Scan complete')}</b><span>· ${parts.join(' · ')}</span></div>`;
+  } else if (job?.error) {
+    resultHtml = `<div class="pretty-message bad">${escapeHtml(job.error)}</div>`;
+  }
+  el.innerHTML = `
+    <div class="pretty-message scan-progress-message ${running ? 'warn' : (job?.status === 'error' ? 'bad' : '')}">${escapeHtml(msg)}</div>
+    <div class="detail-grid three scan-detail-grid">${summaryCards.map(([a,b]) => `<div class="detail-item"><span class="detail-label">${escapeHtml(a)}</span><span class="detail-value">${String(b).startsWith('<span') ? b : escapeHtml(b)}</span></div>`).join('')}</div>
+    ${resultHtml}
+  `;
+}
+function setAutoBadge(running=false){
+  const el = document.getElementById('autoRefreshBadge');
+  if (!el) return;
+  el.innerHTML = running ? '<span class="pulse-dot"></span> Auto refresh · 30s' : '<span class="pulse-dot"></span> Auto refresh · 30s';
+}
+async function loadStatus(){
+  const data = await api('/api/admin/tools/status');
+  const jobs = data.jobs || {};
+  updateStatusCard('scanStatus', jobs.scan);
+  updateStatusCard('deadStatus', jobs.deadcheck);
+  updateStatusCard('dedupeStatus', jobs.dedupe);
+  const sp = data.scan_progress || {};
+  const processed = Number(sp.processed || 0), found = Number(sp.messages_found || 0);
+  const pct = found > 0 ? Math.min(100, Math.round((processed / found) * 100)) : (sp.running ? 7 : 0);
+  document.getElementById('scanProgressBar').style.width = pct + '%';
+  document.getElementById('scanProgressText').textContent = sp.running ? `${pct}% · ${processed}/${found}` : (jobs.scan?.message || 'Idle');
+  renderScanDetails(sp, jobs.scan);
+  setAutoBadge(anyJobRunning(jobs));
+  return data;
+}
+async function manualRefresh(){
+  setButtonLoading('refreshNowBtn', true, 'Refreshing');
+  try { await refreshAll(true); setResult({status:'success', message:'Admin tools refreshed.'}); }
+  catch(e){ setResult({status:'error', message:e.message || String(e)}); }
+  finally { setButtonLoading('refreshNowBtn', false, 'Refresh Now'); }
+}
+async function refreshAll(forceAnalytics=false){
+  const data = await loadStatus();
+  const now = Date.now();
+  if (now - lastSpeedAt > SPEED_REFRESH_MS || forceAnalytics) { lastSpeedAt = now; await loadSpeed().catch(()=>{}); }
+  if (forceAnalytics || now - lastAnalyticsLoad > 120000) { await loadFeaturePack().catch(()=>{}); }
+  schedulePolling(anyJobRunning(data.jobs || {}));
+  return data;
+}
+function stopPolling(){ if(pollTimer){ clearTimeout(pollTimer); pollTimer = null; } }
+function schedulePolling(active=false){
+  stopPolling();
+  if (document.visibilityState !== 'visible') return;
+  const delay = active ? ACTIVE_REFRESH_MS : IDLE_REFRESH_MS;
+  pollTimer = setTimeout(async () => {
+    try { await refreshAll(false); }
+    catch(e){ setResult({status:'error', message:e.message || String(e)}); schedulePolling(false); }
+  }, delay);
+}
+async function startScan(mode){
+  const target = document.getElementById('scanTarget').value.trim();
+  const yes = mode === 'rescan' ? confirm('Rescan will purge old DB entries for selected AUTH_CHANNEL/group and rebuild. Continue?') : true;
+  if(!yes) return;
+  const payload = {mode}; if(target) payload.target = target;
+  setResult(await api('/api/admin/tools/scan', {method:'POST', body:JSON.stringify(payload)}));
+  await refreshAll(true); schedulePolling(true);
+}
+async function cancelScan(){ setResult(await api('/api/admin/tools/scan/cancel', {method:'POST'})); await refreshAll(true); }
+async function startDeadcheck(){ setResult(await api('/api/admin/tools/deadcheck', {method:'POST'})); await refreshAll(true); schedulePolling(true); }
+async function dedupe(confirmRun){
+  if(confirmRun && !confirm('Delete exact duplicate DB entries and queue old Telegram deletes?')) return;
+  setResult(await api('/api/admin/tools/dedupe', {method:'POST', body:JSON.stringify({confirm: confirmRun})}));
+  await refreshAll(true); schedulePolling(true);
+}
+async function clearCacheAll(){ if(!confirm('Clear stream cache from /tmp? Current playback may reload ranges.')) return; setResult(await api('/api/admin/tools/clear-cache', {method:'POST'})); }
+async function syncCatalogs(full){ setResult(await api(`/api/custom-catalogs/auto-sync?full_rebuild=${full ? 'true':'false'}`, {method:'POST'})); await loadFeaturePack(); }
+async function resetTokenUsage(token){ if(!confirm('Reset this token traffic counters?')) return; setResult(await api(`/api/admin/tokens/${encodeURIComponent(token)}/reset-usage`, {method:'POST'})); await loadFeaturePack(); }
+function renderStorageChart(databases){
+  const el = document.getElementById('storageChart');
+  const rows = Array.isArray(databases) ? databases : [];
+  if (!rows.length) { el.innerHTML = '<div class="mini-row">No storage database stats yet.</div>'; return; }
+  const max = Math.max(...rows.map(r => Number(r.file_bytes_est || r.data_size || 0)), 1);
+  el.innerHTML = rows.map(r => {
+    const fileBytes = Number(r.file_bytes_est || 0);
+    const dbBytes = Number(r.data_size || 0) + Number(r.index_size || 0);
+    const pct = Math.max(2, Math.min(100, Math.round((Math.max(fileBytes, dbBytes) / max) * 100)));
+    return `<div class="storage-bar-row">
+      <div class="storage-bar-head">
+        <div><div class="storage-bar-title">${escapeHtml(r.db || 'storage')}</div><div class="text-xs" style="color:var(--text-sec)">${r.movies || 0} movies · ${r.series || 0} series · ${r.streams || 0} streams · ${r.subtitles || 0} subs</div></div>
+        <div class="storage-bar-meta">Library ${escapeHtml(r.file_size_est || formatBytesShort(fileBytes))}<br>DB ${escapeHtml(r.data_readable || formatBytesShort(dbBytes))}</div>
+      </div><div class="storage-bar-wrap"><div class="storage-bar" style="width:${pct}%"></div></div>
+    </div>`;
+  }).join('');
+}
+async function loadFeaturePack(){
+  lastAnalyticsLoad = Date.now();
+  const data = await api('/api/admin/features/dashboard');
+  const storage = data.storage?.summary || {};
+  const usage = data.token_usage?.summary || {};
+  renderStorageChart(data.storage?.databases || []);
+  const topItems = data.top_watched?.items || [];
+  const topics = data.topics?.topics || [];
+  const tokens = data.token_usage?.tokens || [];
+  document.getElementById('analyticsGrid').innerHTML = [
+    ['Storage DBs', storage.storage_dbs ?? 0, storage.data_readable || '0 B'],
+    ['Library Size', storage.file_size_est || '0 B', 'estimated from streams'],
+    ['Monthly Traffic', usage.monthly_readable || '0 B', `${usage.tokens||0} tokens`],
+  ].map(x => `<div class="mini-row"><p class="metric-label">${escapeHtml(x[0])}</p><b class="text-xl">${escapeHtml(x[1])}</b><p class="text-xs" style="color:var(--text-sec)">${escapeHtml(x[2])}</p></div>`).join('');
+  document.getElementById('topWatched').innerHTML = topItems.length ? topItems.map((x,i)=>`<div class="mini-row"><b>${i+1}. ${escapeHtml(x.title)}</b><p style="color:var(--text-sec)">${escapeHtml(x.plays)} plays · ${escapeHtml(x.readable)} · ${escapeHtml(x.avg_mbps)} MB/s</p></div>`).join('') : '<div class="mini-row">No stream analytics yet. Play something first.</div>';
+  document.getElementById('topicStats').innerHTML = topics.length ? topics.slice(0,15).map(x=>`<div class="mini-row"><b>${escapeHtml(x.topic_name || x.name || x.chat_id || 'Unknown source')}</b><p style="color:var(--text-sec)">${x.chat_id && x.chat_id !== 'unknown' ? 'Chat ' + escapeHtml(x.chat_id) + ' · ' : ''}${escapeHtml(x.streams)} streams · ${escapeHtml(x.subtitles)} subs</p></div>`).join('') : '<div class="mini-row">No source/topic data yet. New scans will add it.</div>';
+  document.getElementById('tokenUsage').innerHTML = tokens.length ? tokens.slice(0,20).map(t=>`<div class="mini-row"><b>${escapeHtml(t.name)}</b><p style="color:var(--text-sec)">Today ${escapeHtml(t.daily_readable)} · Month ${escapeHtml(t.monthly_readable)}</p><button class="btn-action small muted mt-2" onclick="resetTokenUsage('${escapeHtml(t.token)}')"><i class="fa-solid fa-rotate-left"></i> Reset quota</button></div>`).join('') : '<div class="mini-row">No tokens found.</div>';
+}
+async function loadSpeed(){
+  const data = await api('/api/admin/tools/speed');
+  const bots = data?.data?.bot_workloads || [];
+  document.getElementById('botGrid').innerHTML = bots.map(b => `
+    <div class="bot-card">
+      <div class="flex items-center justify-between gap-2"><h3 class="font-black text-lg">${escapeHtml(b.display_name || ('Bot ' + ((b.client_index||0)+1)))}</h3><span class="bot-health ${(b.status||'').toLowerCase()}">${escapeHtml(b.status || 'healthy')}</span></div>
+      <div class="grid grid-cols-3 gap-2 mt-4 text-center">
+        <div><p class="metric-label">Active</p><b class="text-2xl">${escapeHtml(b.active_streams ?? 0)}</b></div>
+        <div><p class="metric-label">Recent</p><b class="text-2xl">${escapeHtml(b.recent_streams ?? 0)}</b></div>
+        <div><p class="metric-label">MB/s</p><b class="text-2xl">${escapeHtml(b.avg_mbps ?? 0)}</b></div>
+      </div>
+      ${b.last_active ? `<p class="result-mini mt-3">Last active: ${escapeHtml(b.last_active)}</p>` : ''}
+    </div>`).join('') || '<p style="color:var(--text-sec)">No bot clients loaded yet.</p>';
+}
+window.addEventListener('visibilitychange', () => { if (document.visibilityState !== 'visible') stopPolling(); else refreshAll(false).catch(e => setResult({status:'error', message:e.message || String(e)})); });
+window.addEventListener('load', () => { refreshAll(true).catch(e => setResult({status:'error', message:e.message || String(e)})); });
+</script>
+{% endblock %}

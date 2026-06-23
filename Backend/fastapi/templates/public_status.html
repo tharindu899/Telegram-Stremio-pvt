@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Service Status - Telegram Stremio{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto py-6 sm:py-10">
+  <section class="glass-panel rounded-3xl p-5 sm:p-8">
+    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-text-secondary mb-3">
+          <i class="fa-solid fa-signal text-primary"></i> Public Status
+        </div>
+        <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-text">Telegram Stremio Status</h1>
+        <p class="text-sm text-text-secondary mt-2">Current public availability and indexed content summary.</p>
+      </div>
+      <span class="inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-extrabold {{ 'bg-green-500/15 text-green-300 border border-green-500/25' if stats.status == 'operational' else 'bg-yellow-500/15 text-yellow-300 border border-yellow-500/25' }}">
+        <span class="w-2 h-2 rounded-full {{ 'bg-green-400' if stats.status == 'operational' else 'bg-yellow-400' }} animate-pulse"></span>
+        {{ stats.status|title }}
+      </span>
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-5">
+    <div class="glass-panel rounded-3xl p-5">
+      <p class="text-xs uppercase tracking-widest text-text-secondary font-bold">Uptime</p>
+      <p class="text-2xl font-black mt-1 text-text">{{ stats.uptime }}</p>
+    </div>
+    <div class="glass-panel rounded-3xl p-5">
+      <p class="text-xs uppercase tracking-widest text-text-secondary font-bold">Content</p>
+      <p class="text-2xl font-black mt-1 text-text">{{ stats.total_content }}</p>
+    </div>
+    <div class="glass-panel rounded-3xl p-5">
+      <p class="text-xs uppercase tracking-widest text-text-secondary font-bold">Databases Online</p>
+      <p class="text-2xl font-black mt-1 text-text">{{ stats.databases_online }}</p>
+    </div>
+  </section>
+
+  <div class="mt-5 flex flex-col sm:flex-row gap-3">
+    {% if is_authenticated %}
+    <a href="/" class="inline-flex justify-center items-center gap-2 rounded-2xl bg-primary text-background font-bold px-5 py-3">Open Dashboard</a>
+    {% else %}
+    <a href="/login" class="inline-flex justify-center items-center gap-2 rounded-2xl bg-primary text-background font-bold px-5 py-3">Admin Login</a>
+    {% endif %}
+    <a href="/stremio" class="inline-flex justify-center items-center gap-2 rounded-2xl glass-panel border border-white/10 text-text font-bold px-5 py-3">Setup Guide</a>
+  </div>
+</div>
+{% endblock %}

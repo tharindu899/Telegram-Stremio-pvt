@@ -1,0 +1,26 @@
+# Keep Hugging Face Docker builds small and clean
+.git
+.github
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.log
+log.txt
+.env
+config.env
+*.session
+*.session-journal
+*.session-shm
+*.session-wal
+.venv/
+venv/
+.env/
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.DS_Store
+.vscode/
+.idea/

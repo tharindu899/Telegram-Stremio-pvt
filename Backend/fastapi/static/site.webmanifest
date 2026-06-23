@@ -1,0 +1,14 @@
+{
+  "name": "TG Stremio Admin",
+  "short_name": "TG Stremio",
+  "description": "Telegram Stremio admin panel",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#07101f",
+  "theme_color": "#06b6d4",
+  "icons": [
+    {"src": "/static/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

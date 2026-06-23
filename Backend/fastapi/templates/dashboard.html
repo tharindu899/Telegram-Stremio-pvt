@@ -1,0 +1,1042 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Telegram Stremio{% endblock %}
+
+{% block content %}
+<div class="home-dashboard-page min-h-screen pb-8 sm:pb-12">
+    <header class="mb-6 sm:mb-8">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-primary to-accent">
+                    System Overview
+                </h1>
+                <p class="text-text-secondary text-sm mt-1">Real-time performance, live stream activity, and token access management</p>
+            </div>
+
+            <button onclick="refreshDashboard()"
+                class="flex items-center justify-center space-x-2 px-6 py-3 rounded-2xl bg-primary/10 border border-primary/20 hover:bg-primary hover:text-background transition-all group active:scale-95">
+                <i id="refresh-icon" class="fa-solid fa-arrows-rotate group-hover:rotate-180 transition-transform duration-700"></i>
+                <span class="font-bold text-sm uppercase tracking-wider">Refresh Data</span>
+            </button>
+        </div>
+    </header>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+        <div class="glass-panel p-5 rounded-[2rem] flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-glow">
+                <i class="fa-solid fa-clock"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Uptime</p>
+                <p id="sys-uptime" class="text-lg font-bold text-text">{{ system_stats.uptime or 'N/A' }}</p>
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-[2rem] flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center text-accent shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)]">
+                <i class="fa-solid fa-robot"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Active Bots</p>
+                <p id="sys-bots-count" class="text-lg font-bold text-text">{{ system_stats.connected_bots|default(0) }} Nodes</p>
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-[2rem] flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary shadow-glow">
+                <i class="fa-solid fa-tower-broadcast"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Live Streams</p>
+                <p id="sys-live-streams" class="text-lg font-bold text-text">{{ system_stats.total_active_streams }} Active</p>
+            </div>
+        </div>
+
+        <div class="glass-panel p-5 rounded-[2rem] flex items-center gap-4">
+            <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-text-secondary">
+                <i class="fa-solid fa-code-branch"></i>
+            </div>
+            <div>
+                <p class="text-[10px] uppercase font-bold text-text-secondary tracking-widest">Version</p>
+                <p id="sys-version" class="text-lg font-bold text-text">v{{ system_stats.version or '1.0.0' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-5 sm:gap-8">
+        <div class="lg:col-span-2 space-y-8">
+            <section>
+                <h3 class="flex items-center gap-2 text-lg font-bold mb-4 ml-2">
+                    <i class="fa-solid fa-database text-primary"></i> Storage Nodes
+                </h3>
+
+                <div class="grid md:grid-cols-2 gap-4">
+                    {% for db_stat in system_stats.databases %}
+                    {% set db_name = db_stat.db_name|default(db_stat.name|default("storage_" ~ loop.index)) %}
+                    {% set storage_size = db_stat.storageSize|default(0) %}
+                    <div class="glass-panel p-6 rounded-[2rem] border-white/5 bg-card/10">
+                        <div class="flex justify-between items-start mb-6">
+                            <h4 class="font-bold text-text">{{ db_name.replace("storage_", "Node ") }}</h4>
+                            <span class="text-[10px] bg-primary/10 text-primary px-2 py-1 rounded-lg font-bold uppercase">Online</span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="flex justify-between text-sm">
+                                <span class="text-text-secondary">Movies / TV</span>
+                                <span class="font-bold text-text">{{ db_stat.movie_count|default(0) }} / {{ db_stat.tv_count|default(0) }}</span>
+                            </div>
+
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-xs font-bold uppercase tracking-widest">
+                                    <span class="text-text-secondary">Disk Usage</span>
+                                    <span class="text-primary">{{ "%.1f"|format(storage_size / 1024 / 1024) }} MB</span>
+                                </div>
+                                <div class="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                    {% set storage_percent = (storage_size / (500 * 1024 * 1024) * 100) | round %}
+                                    <div class="h-full bg-gradient-to-r from-primary to-accent transition-all duration-1000" style="width: {{ storage_percent }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <a href="/media/manage?media_type=movie" class="glass-panel p-6 rounded-[2rem] hover:bg-primary/5 transition-all group border border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-film text-2xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-text">Manage Movies</h4>
+                            <p class="text-xs text-text-secondary">Organize and edit library</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right ml-auto text-white/20 group-hover:text-primary group-hover:translate-x-1 transition-all"></i>
+                    </div>
+                </a>
+
+                <a href="/media/manage?media_type=tv" class="glass-panel p-6 rounded-[2rem] hover:bg-accent/5 transition-all group border border-white/5">
+                    <div class="flex items-center gap-4">
+                        <div class="w-14 h-14 rounded-2xl bg-accent/10 flex items-center justify-center text-accent group-hover:scale-110 transition-transform">
+                            <i class="fa-solid fa-tv text-2xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-text">Manage TV Shows</h4>
+                            <p class="text-xs text-text-secondary">Handle series and episodes</p>
+                        </div>
+                        <i class="fa-solid fa-chevron-right ml-auto text-white/20 group-hover:text-accent group-hover:translate-x-1 transition-all"></i>
+                    </div>
+                </a>
+            </section>
+        </div>
+
+        <div class="lg:col-span-1">
+            <div class="glass-panel rounded-[2.5rem] overflow-hidden h-full">
+                <div class="p-6 border-b border-white/5">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <h3 class="flex items-center gap-2 text-lg font-bold">
+                            <i class="fa-solid fa-circle-play text-red-500 animate-pulse"></i> Live Network
+                        </h3>
+                        <span id="live-stream-count" class="text-[10px] font-bold uppercase tracking-[0.2em] text-primary bg-primary/10 px-3 py-1 rounded-full">
+                            {{ system_stats.total_active_streams or 0 }} Active
+                        </span>
+                    </div>
+                    <p class="text-sm text-text-secondary">Current sessions only</p>
+                </div>
+
+                <div class="p-6 space-y-6">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="glass-panel p-4 rounded-2xl">
+                            <p class="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Live Now</p>
+                            <p id="live-now-count" class="text-2xl font-extrabold mt-1 text-text">{{ system_stats.total_active_streams or 0 }}</p>
+                        </div>
+                        <div class="glass-panel p-4 rounded-2xl">
+                            <p class="text-[10px] uppercase font-bold tracking-widest text-text-secondary">Recent</p>
+                            <p id="recent-stream-count" class="text-2xl font-extrabold mt-1 text-text">0</p>
+                        </div>
+                    </div>
+
+                    <div>
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-sm font-bold text-text">Active Streams</h4>
+                            <span class="text-[10px] uppercase tracking-widest text-text-secondary">Real-time</span>
+                        </div>
+                        <div id="active-streams-container" class="space-y-4">
+                            {% if system_stats.active_streams %}
+                                {% for stream in system_stats.active_streams %}
+                                <div class="stream-card rounded-[2rem] p-5">
+                                    <div class="flex justify-between items-start gap-3">
+                                        <div class="min-w-0 pr-2">
+                                            <h5 class="font-bold text-sm text-text truncate">{{ stream.title or stream.meta.get('title') or 'Unknown Stream' }}</h5>
+                                            <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-text-secondary">
+                                                <span>Bot {{ (stream.client_index or 0) + 1 }}</span>
+                                                <span>•</span>
+                                                <span>DC {{ stream.dc_id or '-' }}</span>
+                                                <span>•</span>
+                                                <span class="font-mono">{{ stream.stream_id[:12] if stream.stream_id else 'Unknown' }}{% if stream.stream_id %}…{% endif %}</span>
+                                            </div>
+                                        </div>
+                                        <span class="text-[10px] font-bold px-2 py-1 rounded-lg uppercase whitespace-nowrap stream-badge-live">
+                                            Live
+                                        </span>
+                                    </div>
+
+                                    <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5">
+                                        <div class="text-center">
+                                            <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Speed</p>
+                                            <p class="text-xs font-bold text-text">{{ "%.3f"|format(stream.avg_mbps or 0) }} MB/s</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Total</p>
+                                            <p class="text-xs font-bold text-text">{{ "%.1f"|format((stream.total_bytes or 0) / 1024 / 1024) }} MB</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Duration</p>
+                                            <p class="text-xs font-bold text-text live-duration" data-start-ts="{{ stream.start_ts or 0 }}">0s</p>
+                                        </div>
+                                        <div class="text-center">
+                                            <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Status</p>
+                                            <p class="text-xs font-bold text-text">{{ stream.status or 'active' }}</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+                                        <div class="flex items-center justify-between text-xs gap-3">
+                                            <span class="text-text-secondary">Started</span>
+                                            <span class="text-text text-right truncate max-w-[65%] live-started" data-start-ts="{{ stream.start_ts or 0 }}">—</span>
+                                        </div>
+                                        <div class="flex items-center justify-between text-xs gap-3">
+                                            <span class="text-text-secondary">Stream ID</span>
+                                            <span class="font-mono text-text text-right truncate max-w-[65%]">{{ stream.stream_id or 'Unknown' }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="glass-panel p-8 rounded-[2rem] text-center border-dashed border-white/10">
+                                    <i class="fa-solid fa-satellite-dish text-4xl text-white/10 mb-3"></i>
+                                    <p class="text-sm text-text-secondary font-medium">No active streams right now</p>
+                                    <p class="text-xs text-text-secondary mt-1">The live network is idle at the moment.</p>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <section class="mt-7 sm:mt-12">
+        <div class="glass-panel rounded-[2.5rem] overflow-hidden">
+            <div class="p-8 border-b border-white/5 flex flex-col md:flex-row justify-between items-center gap-4">
+                <div>
+                    <h3 class="text-xl font-bold text-text">Access Management</h3>
+                    <p class="text-sm text-text-secondary">Control API tokens, daily quotas, and monthly quotas</p>
+                </div>
+                <button onclick="toggleCreateForm()" id="create-btn-container"
+                    class="px-6 py-3 bg-primary text-background font-bold rounded-2xl hover:brightness-110 transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-plus"></i> New Token
+                </button>
+            </div>
+
+            <div id="create-form-container" class="hidden p-8 bg-white/5 border-b border-white/5 animate-in fade-in slide-in-from-top-4">
+                <form onsubmit="createToken(event)" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                    <div class="md:col-span-2">
+                        <label class="text-[10px] font-bold uppercase text-text-secondary tracking-widest ml-2 mb-1 block">Token Alias</label>
+                        <input type="text" id="token-name" placeholder="E.g., Living Room TV" required
+                            class="w-full px-4 py-3 rounded-xl border border-white/10 focus:border-primary outline-none text-sm text-text placeholder:text-text-secondary bg-[color-mix(in_srgb,var(--card)_88%,var(--background)_12%)]">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-text-secondary tracking-widest ml-2 mb-1 block">Daily (GB)</label>
+                        <input type="number" id="daily-limit" value="0" step="0.1" min="0"
+                            class="w-full px-4 py-3 rounded-xl border border-white/10 focus:border-primary outline-none text-sm text-text placeholder:text-text-secondary bg-[color-mix(in_srgb,var(--card)_88%,var(--background)_12%)]">
+                    </div>
+
+                    <div>
+                        <label class="text-[10px] font-bold uppercase text-text-secondary tracking-widest ml-2 mb-1 block">Monthly (GB)</label>
+                        <input type="number" id="monthly-limit" value="0" step="0.1" min="0"
+                            class="w-full px-4 py-3 rounded-xl border border-white/10 focus:border-primary outline-none text-sm text-text placeholder:text-text-secondary bg-[color-mix(in_srgb,var(--card)_88%,var(--background)_12%)]">
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="submit" class="flex-1 py-3 bg-primary text-background font-bold rounded-xl text-sm">Create</button>
+                        <button type="button" onclick="toggleCreateForm()" class="px-4 py-3 bg-white/5 text-text-secondary rounded-xl hover:bg-white/10 transition-colors">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="overflow-x-auto token-table-wrap">
+                <table class="w-full min-w-[780px] text-left">
+                    <thead>
+                        <tr class="bg-white/5 text-[10px] uppercase tracking-[0.2em] font-bold text-text-secondary">
+                            <th class="py-5 px-8">Client Name</th>
+                            <th class="py-5 px-8">Usage</th>
+                            <th class="py-5 px-8">Limits</th>
+                            <th class="py-5 px-8">Manifest Link</th>
+                            <th class="py-5 px-8 text-right">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-white/5">
+                        {% for token in api_tokens %}
+                        {% set token_name = token.name|default("Client " ~ loop.index) %}
+                        {% set token_value = token.token|default("") %}
+                        {% set token_usage = token.usage|default({}) %}
+                        {% set daily_usage = token_usage.daily|default({}) %}
+                        {% set monthly_usage = token_usage.monthly|default({}) %}
+                        {% set token_limits = token.limits|default({}) %}
+                        {% set daily_limit = token_limits.daily_limit_gb|default(0) %}
+                        {% set monthly_limit = token_limits.monthly_limit_gb|default(0) %}
+                        <tr class="group hover:bg-white/[0.02] transition-colors" id="token-row-{{ loop.index0 }}">
+                            <td class="py-6 px-8">
+                                <p class="font-bold text-text">{{ token_name }}</p>
+                                <p class="text-[10px] text-text-secondary uppercase mt-1">
+                                    {{ token.created_at.strftime('%Y-%m-%d') if token.created_at and token.created_at.strftime is defined else (token.created_at|string if token.created_at else 'Unknown date') }}
+                                </p>
+                            </td>
+
+                            <td class="py-6 px-8">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-xs text-text font-medium">
+                                        Daily: <span class="text-primary" data-bytes="{{ daily_usage.bytes|default(0) }}"></span>
+                                    </span>
+                                    <span class="text-xs text-text font-medium">
+                                        Monthly: <span class="text-accent" data-bytes="{{ monthly_usage.bytes|default(0) }}"></span>
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td class="py-6 px-8">
+                                <div class="flex flex-col gap-1">
+                                    <span class="text-[10px] text-text-secondary uppercase">
+                                        Daily Limit: {{ daily_limit or '∞' }} GB
+                                    </span>
+                                    <span class="text-[10px] text-text-secondary uppercase">
+                                        Monthly Limit: {{ monthly_limit or '∞' }} GB
+                                    </span>
+                                </div>
+                            </td>
+
+                            <td class="py-6 px-8">
+                                <button onclick='copyUrl({{ ((request.base_url|string).replace("http:", "https:") ~ "stremio/" ~ token_value ~ "/manifest.json")|tojson }})'
+                                    class="flex items-center gap-2 px-3 py-1.5 bg-background/50 rounded-lg border border-white/5 text-[10px] font-bold text-text-secondary hover:text-primary hover:border-primary/30 transition-all">
+                                    <i class="fa-solid fa-link text-[8px]"></i> COPY MANIFEST
+                                </button>
+                            </td>
+
+                            <td class="py-6 px-8 text-right">
+                                <div class="flex justify-end gap-2">
+                                    <button onclick='openEditModal({{ token_value|tojson }}, {{ daily_limit|tojson }}, {{ monthly_limit|tojson }})'
+                                        class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-secondary hover:bg-blue-500 hover:text-white transition-all token-action-btn">
+                                        <i class="fa-solid fa-pen-to-square text-xs"></i>
+                                    </button>
+                                    <button onclick='revokeToken({{ token_value|tojson }})'
+                                        class="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center text-text-secondary hover:bg-red-500 hover:text-white transition-all token-action-btn">
+                                        <i class="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+
+                        {% if not api_tokens %}
+                        <tr>
+                            <td colspan="5" class="py-10 px-8 text-center text-text-secondary">
+                                No tokens found.
+                            </td>
+                        </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+
+<div id="edit-modal" class="fixed inset-0 bg-background/80 backdrop-blur-md hidden flex items-center justify-center z-50 p-4">
+    <div class="glass-panel rounded-[2rem] p-8 w-full max-w-md border border-white/10 shadow-2xl">
+        <h3 class="text-xl font-bold mb-2">Edit Limits</h3>
+        <p class="text-sm text-text-secondary mb-6">Modify daily and monthly data quotas for this token.</p>
+
+        <input type="hidden" id="edit-token-id">
+        <div class="space-y-4">
+            <div>
+                <label class="text-[10px] font-bold uppercase text-text-secondary tracking-widest ml-1 mb-1 block">Daily Limit (GB)</label>
+                <input type="number" id="edit-daily" step="0.1" min="0"
+                    class="w-full px-4 py-3 rounded-xl border border-white/10 focus:border-primary outline-none text-text placeholder:text-text-secondary bg-[color-mix(in_srgb,var(--card)_88%,var(--background)_12%)]">
+            </div>
+            <div>
+                <label class="text-[10px] font-bold uppercase text-text-secondary tracking-widest ml-1 mb-1 block">Monthly Limit (GB)</label>
+                <input type="number" id="edit-monthly" step="0.1" min="0"
+                    class="w-full px-4 py-3 rounded-xl border border-white/10 focus:border-primary outline-none text-text placeholder:text-text-secondary bg-[color-mix(in_srgb,var(--card)_88%,var(--background)_12%)]">
+            </div>
+        </div>
+
+        <div class="mt-8 flex gap-3">
+            <button onclick="closeEditModal()" class="flex-1 py-3 bg-white/5 hover:bg-white/10 text-text rounded-xl font-bold transition-all">Cancel</button>
+            <button onclick="saveTokenLimits()" class="flex-1 py-3 bg-primary text-background rounded-xl font-bold transition-all">Save Changes</button>
+        </div>
+    </div>
+</div>
+
+
+<style>
+    .shadow-glow {
+        filter: drop-shadow(0 0 8px rgba(var(--primary-rgb), 0.4));
+    }
+
+    .stream-card {
+        background: color-mix(in srgb, var(--card) 55%, transparent);
+        border: 1px solid var(--border);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.16);
+    }
+
+    .stream-badge-live {
+        background: color-mix(in srgb, var(--primary) 18%, transparent);
+        color: var(--primary);
+    }
+
+    .stream-badge-recent {
+        background: color-mix(in srgb, var(--accent) 16%, transparent);
+        color: var(--accent);
+    }
+
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="password"],
+    input[type="search"],
+    input[type="url"],
+    textarea,
+    select {
+        color: var(--text) !important;
+        border-color: var(--border) !important;
+        caret-color: var(--primary);
+        background: color-mix(in srgb, var(--card) 88%, var(--background) 12%);
+    }
+
+    input[type="text"]::placeholder,
+    input[type="number"]::placeholder,
+    input[type="email"]::placeholder,
+    input[type="password"]::placeholder,
+    input[type="search"]::placeholder,
+    input[type="url"]::placeholder,
+    textarea::placeholder {
+        color: var(--text-secondary);
+        opacity: 0.95;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+        outline: none;
+        border-color: var(--primary) !important;
+        box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
+    }
+
+    input:-webkit-autofill,
+    input:-webkit-autofill:hover,
+    input:-webkit-autofill:focus {
+        -webkit-text-fill-color: var(--text) !important;
+        box-shadow: 0 0 0px 1000px color-mix(in srgb, var(--card) 88%, var(--background) 12%) inset !important;
+        transition: background-color 9999s ease-in-out 0s;
+    }
+
+
+    .home-dashboard-page .glass-panel {
+        overflow-wrap: anywhere;
+    }
+
+    .home-dashboard-page table th,
+    .home-dashboard-page table td {
+        vertical-align: middle;
+    }
+
+    @media (max-width: 640px) {
+        .home-dashboard-page header .flex button {
+            width: 100%;
+            padding-block: 0.85rem;
+        }
+
+        .home-dashboard-page h1 {
+            line-height: 1.08;
+        }
+
+        .home-dashboard-page .rounded-\[2\.5rem\],
+        .home-dashboard-page .rounded-\[2rem\] {
+            border-radius: 1.35rem !important;
+        }
+
+        .home-dashboard-page .p-8 {
+            padding: 1rem !important;
+        }
+
+        .home-dashboard-page .p-6 {
+            padding: 1rem !important;
+        }
+
+        .home-dashboard-page #create-form-container form .flex {
+            width: 100%;
+        }
+
+        .home-dashboard-page #create-form-container form button[type="submit"] {
+            min-width: 0;
+        }
+
+        .home-dashboard-page #edit-modal .glass-panel {
+            padding: 1.15rem !important;
+        }
+
+        /* Mobile token table becomes clean cards instead of a cut-off wide table */
+        .home-dashboard-page .overflow-x-auto:has(table) { overflow: visible !important; }
+        .home-dashboard-page table { min-width: 0 !important; width: 100% !important; display: block !important; }
+        .home-dashboard-page table thead { display: none !important; }
+        .home-dashboard-page table tbody { display: grid !important; gap: .85rem !important; }
+        .home-dashboard-page table tr {
+            display: grid !important;
+            border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+            border-radius: 1.15rem !important;
+            background: color-mix(in srgb, var(--card) 86%, var(--bg) 14%) !important;
+            padding: .75rem !important;
+        }
+        .home-dashboard-page table td {
+            display: grid !important;
+            grid-template-columns: 96px minmax(0,1fr) !important;
+            gap: .65rem !important;
+            align-items: center !important;
+            padding: .52rem .25rem !important;
+            border: 0 !important;
+            text-align: left !important;
+        }
+        .home-dashboard-page table td::before {
+            color: var(--text-sec);
+            font-size: .68rem;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+        }
+        .home-dashboard-page table td:nth-child(1)::before { content: 'Client'; }
+        .home-dashboard-page table td:nth-child(2)::before { content: 'Usage'; }
+        .home-dashboard-page table td:nth-child(3)::before { content: 'Limits'; }
+        .home-dashboard-page table td:nth-child(4)::before { content: 'Manifest'; }
+        .home-dashboard-page table td:nth-child(5)::before { content: 'Actions'; }
+        .home-dashboard-page table td:last-child > div { justify-content: flex-start !important; }
+
+    }
+
+
+    @media (max-width: 640px) {
+        .home-dashboard-page .token-table-wrap { overflow: visible !important; }
+        .home-dashboard-page .token-table-wrap table { min-width: 0 !important; width: 100% !important; display: block !important; }
+        .home-dashboard-page .token-table-wrap thead { display: none !important; }
+        .home-dashboard-page .token-table-wrap tbody { display: grid !important; gap: .7rem !important; }
+        .home-dashboard-page .token-table-wrap tr {
+            display: grid !important;
+            border: 1px solid color-mix(in srgb, var(--border) 76%, transparent) !important;
+            border-radius: .85rem !important;
+            background: color-mix(in srgb, var(--card) 86%, var(--bg) 14%) !important;
+            padding: .7rem !important;
+            min-width: 0 !important;
+        }
+        .home-dashboard-page .token-table-wrap td {
+            display: grid !important;
+            grid-template-columns: 82px minmax(0,1fr) !important;
+            gap: .5rem !important;
+            align-items: center !important;
+            padding: .42rem .1rem !important;
+            border: 0 !important;
+            text-align: left !important;
+            min-width: 0 !important;
+            overflow-wrap: anywhere;
+        }
+        .home-dashboard-page .token-table-wrap td::before {
+            color: var(--text-sec);
+            font-size: .64rem;
+            font-weight: 900;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+        }
+        .home-dashboard-page .token-table-wrap td:nth-child(1)::before { content: 'Client'; }
+        .home-dashboard-page .token-table-wrap td:nth-child(2)::before { content: 'Usage'; }
+        .home-dashboard-page .token-table-wrap td:nth-child(3)::before { content: 'Limits'; }
+        .home-dashboard-page .token-table-wrap td:nth-child(4)::before { content: 'Manifest'; }
+        .home-dashboard-page .token-table-wrap td:nth-child(5)::before { content: 'Actions'; }
+        .home-dashboard-page .token-table-wrap td:last-child > div { justify-content: flex-start !important; }
+        .home-dashboard-page #create-form-container form { gap: .65rem !important; }
+        .home-dashboard-page #create-form-container form .flex { display: grid !important; grid-template-columns: 1fr 2.75rem; gap: .55rem !important; }
+    }
+
+
+</style>
+
+<script>
+    const streamState = {
+        currentEditToken: null,
+        activeStreams: []
+    };
+
+    function toggleCreateForm() {
+        const formContainer = document.getElementById('create-form-container');
+        const btnContainer = document.getElementById('create-btn-container');
+        if (!formContainer || !btnContainer) return;
+
+        if (formContainer.classList.contains('hidden')) {
+            formContainer.classList.remove('hidden');
+            btnContainer.classList.add('hidden');
+        } else {
+            formContainer.classList.add('hidden');
+            btnContainer.classList.remove('hidden');
+        }
+    }
+
+    function openEditModal(token, daily, monthly) {
+    const tokenStr = String(token || '');
+    streamState.currentEditToken = tokenStr;
+    document.getElementById('edit-token-id').value = tokenStr;
+    document.getElementById('edit-daily').value = (daily === null || daily === undefined) ? 0 : daily;
+    document.getElementById('edit-monthly').value = (monthly === null || monthly === undefined) ? 0 : monthly;
+    const modal = document.getElementById('edit-modal');
+    modal.classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+        document.getElementById('edit-modal').classList.add('hidden');
+        streamState.currentEditToken = null;
+    }
+
+    async function saveTokenLimits() {
+        if (!streamState.currentEditToken) return;
+
+        const daily = Number(document.getElementById('edit-daily').value || 0);
+        const monthly = Number(document.getElementById('edit-monthly').value || 0);
+
+        try {
+            const response = await fetch('/api/tokens/' + encodeURIComponent(streamState.currentEditToken), {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    daily_limit_gb: daily,
+                    monthly_limit_gb: monthly
+                })
+            });
+
+            if (response.ok) {
+                closeEditModal();
+                showToast('Token limits updated successfully.', 'success', 'Updated');
+                setTimeout(() => window.location.reload(), 500);
+                return;
+            }
+
+            let message = 'Failed to update limits';
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (_) {}
+            showToast(message, 'error', 'Update failed');
+        } catch (error) {
+            console.error(error);
+            showToast('Error updating limits', 'error', 'Update failed');
+        }
+    }
+
+    async function createToken(event) {
+        event.preventDefault();
+
+        const nameInput = document.getElementById('token-name');
+        const dailyInput = document.getElementById('daily-limit');
+        const monthlyInput = document.getElementById('monthly-limit');
+
+        const payload = {
+            name: nameInput.value.trim(),
+            daily_limit_gb: Number(dailyInput.value || 0),
+            monthly_limit_gb: Number(monthlyInput.value || 0)
+        };
+
+        if (!payload.name) {
+            showToast('Token alias is required.', 'error', 'Validation');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/tokens', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                showToast('Token created successfully.', 'success', 'Created');
+                setTimeout(() => window.location.reload(), 500);
+                return;
+            }
+
+            let message = 'Error creating token';
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (_) {}
+            showToast(message, 'error', 'Create failed');
+        } catch (error) {
+            console.error(error);
+            showToast('Error creating token', 'error', 'Create failed');
+        }
+    }
+
+    async function revokeToken(token) {
+        if (!confirm('Are you sure you want to revoke this token? The user will lose access immediately.')) return;
+
+        try {
+            const response = await fetch('/api/tokens/' + encodeURIComponent(String(token || '')), {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                showToast('Token deleted successfully.', 'success', 'Deleted');
+                setTimeout(() => window.location.reload(), 500);
+                return;
+            }
+
+            let message = 'Error deleting token';
+            try {
+                const data = await response.json();
+                message = data.detail || data.message || message;
+            } catch (_) {}
+            showToast(message, 'error', 'Delete failed');
+        } catch (error) {
+            console.error(error);
+            showToast('Error deleting token', 'error', 'Delete failed');
+        }
+    }
+
+    async function copyUrl(url) {
+        const text = String(url || '');
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+            } else {
+                const temp = document.createElement('textarea');
+                temp.value = text;
+                temp.setAttribute('readonly', '');
+                temp.style.position = 'fixed';
+                temp.style.left = '-9999px';
+                temp.style.top = '0';
+                document.body.appendChild(temp);
+                temp.focus();
+                temp.select();
+                const ok = document.execCommand('copy');
+                document.body.removeChild(temp);
+                if (!ok) throw new Error('copy failed');
+            }
+            showToast('Manifest URL copied to clipboard.', 'success', 'Copied');
+        } catch (error) {
+            console.error(error);
+            showToast('Failed to copy manifest URL.', 'error', 'Copy failed');
+        }
+    }
+
+    function escapeHtml(unsafe) {
+        if (unsafe === null || unsafe === undefined) return '';
+        return String(unsafe)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function formatBytes(bytes) {
+        const value = Number(bytes || 0);
+        if (!value) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+        return (value / Math.pow(1024, index)).toFixed(index === 0 ? 0 : 2) + ' ' + units[index];
+    }
+
+    function formatDuration(seconds) {
+        const value = Math.max(0, Number(seconds || 0));
+        const total = Math.floor(value);
+
+        const h = Math.floor(total / 3600);
+        const m = Math.floor((total % 3600) / 60);
+        const s = total % 60;
+
+        if (h > 0) {
+            return `${h}h ${m}m ${s}s`;
+        }
+        if (m > 0) {
+            return `${m}m ${s}s`;
+        }
+        return `${s}s`;
+    }
+
+    function formatTimestamp(ts) {
+        const value = Number(ts || 0);
+        if (!value) return '—';
+        const date = new Date(value * 1000);
+        if (Number.isNaN(date.getTime())) return '—';
+        return date.toLocaleString();
+    }
+
+    function getStreamTitle(stream) {
+        return stream?.title || stream?.meta?.title || 'Unknown Stream';
+    }
+
+    function getClientLabel(stream) {
+        const parts = [];
+        if (stream?.client_index !== null && stream?.client_index !== undefined) {
+            parts.push('Bot ' + (Number(stream.client_index) + 1));
+        }
+        if (stream?.dc_id !== null && stream?.dc_id !== undefined) {
+            parts.push('DC ' + stream.dc_id);
+        }
+        return parts.length ? parts.join(' • ') : 'Unknown node';
+    }
+
+    function getStatusBadge(status) {
+        const normalized = String(status || '').toLowerCase();
+
+        if (normalized === 'active') {
+            return { className: 'stream-badge-live', text: 'Live' };
+        }
+        if (normalized === 'cancelled') {
+            return { className: 'bg-yellow-500/15 text-yellow-300', text: 'Cancelled' };
+        }
+        if (normalized === 'completed' || normalized === 'finished') {
+            return { className: 'bg-green-500/15 text-green-300', text: 'Completed' };
+        }
+        if (normalized === 'failed' || normalized === 'error') {
+            return { className: 'bg-red-500/15 text-red-300', text: normalized.charAt(0).toUpperCase() + normalized.slice(1) };
+        }
+
+        return {
+            className: 'stream-badge-recent',
+            text: normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : 'Live'
+        };
+    }
+
+    function getLiveDuration(stream) {
+        const startTs = Number(stream?.start_ts || 0);
+        if (!startTs) return '0s';
+        const now = Date.now() / 1000;
+        return formatDuration(now - startTs);
+    }
+
+    function renderStreamCard(stream) {
+        const status = getStatusBadge(stream?.status);
+        const title = escapeHtml(getStreamTitle(stream));
+        const streamId = escapeHtml(stream?.stream_id ? String(stream.stream_id).slice(0, 12) + '…' : 'Unknown');
+        const label = escapeHtml(getClientLabel(stream));
+        const totalBytes = formatBytes(stream?.total_bytes || 0);
+        const avgSpeed = stream?.avg_mbps !== null && stream?.avg_mbps !== undefined
+            ? Number(stream.avg_mbps).toFixed(3) + ' MB/s'
+            : '—';
+        const started = formatTimestamp(stream?.start_ts);
+        const liveDuration = getLiveDuration(stream);
+
+        return `
+            <div class="stream-card rounded-[2rem] p-5">
+                <div class="flex justify-between items-start gap-3">
+                    <div class="min-w-0 pr-2">
+                        <h5 class="font-bold text-sm text-text truncate">${title}</h5>
+                        <div class="mt-1 flex flex-wrap items-center gap-2 text-[10px] uppercase tracking-widest text-text-secondary">
+                            <span>${label}</span>
+                            <span>•</span>
+                            <span>${streamId}</span>
+                        </div>
+                    </div>
+                    <span class="text-[10px] font-bold px-2 py-1 rounded-lg uppercase whitespace-nowrap ${status.className}">
+                        ${escapeHtml(status.text)}
+                    </span>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-white/5">
+                    <div class="text-center">
+                        <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Speed</p>
+                        <p class="text-xs font-bold text-text">${avgSpeed}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Total</p>
+                        <p class="text-xs font-bold text-text">${escapeHtml(totalBytes)}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Duration</p>
+                        <p class="text-xs font-bold text-text live-duration">${escapeHtml(liveDuration)}</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[9px] text-text-secondary uppercase tracking-widest font-bold">Started</p>
+                        <p class="text-xs font-bold text-text truncate live-started">${escapeHtml(started)}</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+                    <div class="flex items-center justify-between text-xs gap-3">
+                        <span class="text-text-secondary">Stream ID</span>
+                        <span class="font-mono text-text text-right truncate max-w-[65%]">${streamId}</span>
+                    </div>
+                    <div class="flex items-center justify-between text-xs gap-3">
+                        <span class="text-text-secondary">Status</span>
+                        <span class="text-text text-right truncate max-w-[65%]">${escapeHtml(stream?.status || 'active')}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderEmptyState(icon, title, subtitle) {
+        return `
+            <div class="glass-panel p-8 rounded-[2rem] text-center border-dashed border-white/10">
+                <i class="${icon} text-4xl text-white/10 mb-3"></i>
+                <p class="text-sm text-text-secondary font-medium">${escapeHtml(title)}</p>
+                <p class="text-xs text-text-secondary mt-1">${escapeHtml(subtitle)}</p>
+            </div>
+        `;
+    }
+
+    async function loadStreamStats() {
+        const activeContainer = document.getElementById('active-streams-container');
+        const liveCount = document.getElementById('live-stream-count');
+        const liveNowCount = document.getElementById('live-now-count');
+        const recentCount = document.getElementById('recent-stream-count');
+
+        try {
+            const response = await fetch('/stream/stats', { cache: 'no-store' });
+            if (!response.ok) throw new Error('Failed to load stream stats');
+
+            const data = await response.json();
+            const activeStreams = Array.isArray(data.active_streams) ? data.active_streams : [];
+            const recentStreams = Array.isArray(data.recent_streams) ? data.recent_streams : [];
+
+            streamState.activeStreams = activeStreams;
+
+            if (liveCount) liveCount.textContent = activeStreams.length + ' Active';
+            if (liveNowCount) liveNowCount.textContent = String(activeStreams.length);
+            if (recentCount) recentCount.textContent = String(recentStreams.length);
+
+            if (activeContainer) {
+                activeContainer.innerHTML = activeStreams.length
+                    ? activeStreams.map(stream => renderStreamCard(stream)).join('')
+                    : renderEmptyState(
+                        'fa-solid fa-satellite-dish',
+                        'No active streams right now',
+                        'The live network is idle at the moment.'
+                    );
+            }
+        } catch (error) {
+            console.error(error);
+            if (activeContainer) {
+                activeContainer.innerHTML = renderEmptyState(
+                    'fa-solid fa-triangle-exclamation',
+                    'Unable to load live network',
+                    'Please try refreshing the page.'
+                );
+            }
+        }
+    }
+
+    function refreshLiveDurations() {
+        const cards = document.querySelectorAll('#active-streams-container .stream-card');
+        cards.forEach((card, index) => {
+            const durationEl = card.querySelector('.live-duration');
+            const stream = streamState.activeStreams[index];
+            if (durationEl && stream) {
+                durationEl.textContent = getLiveDuration(stream);
+            }
+        });
+    }
+
+    async function refreshDashboard() {
+        const icon = document.getElementById('refresh-icon');
+        if (icon) icon.classList.add('animate-spin');
+
+        try {
+            const response = await fetch('/api/system/stats', { cache: 'no-store' });
+            if (response.ok) {
+                const stats = await response.json();
+
+                const elUptime = document.getElementById('sys-uptime');
+                if (elUptime) elUptime.innerText = stats.uptime || 'N/A';
+
+                const elBotCount = document.getElementById('sys-bots-count');
+                if (elBotCount) elBotCount.innerText = (stats.connected_bots ?? 0) + ' Nodes';
+
+                const elLive = document.getElementById('sys-live-streams');
+                if (elLive) elLive.innerText = (stats.total_active_streams ?? 0) + ' Active';
+
+                const elVersion = document.getElementById('sys-version');
+                if (elVersion) elVersion.innerText = 'v' + (stats.version || '1.0.0');
+
+                if (stats.databases && Array.isArray(stats.databases)) {
+                    stats.databases.forEach((db, index) => {
+                        const elMovies = document.getElementById(`db-movies-${index}`);
+                        if (elMovies) elMovies.innerText = db.movie_count.toLocaleString();
+
+                        const elTv = document.getElementById(`db-tv-${index}`);
+                        if (elTv) elTv.innerText = db.tv_count.toLocaleString();
+
+                        const elStorage = document.getElementById(`db-storage-${index}`);
+                        if (elStorage) {
+                            const mb = db.storageSize / (1024 * 1024);
+                            elStorage.innerText = mb.toFixed(1) + ' MB';
+                        }
+                    });
+                }
+
+                if (stats.api_tokens && Array.isArray(stats.api_tokens)) {
+                    const rows = document.querySelectorAll('tbody tr');
+                    stats.api_tokens.forEach((token, index) => {
+                        if (rows.length > index && !rows[index].querySelector('[colspan]')) {
+                            const row = rows[index];
+
+                            const dailyUsageSpan = row.querySelector('td:nth-child(2) span[data-bytes]');
+                            const monthlyUsageSpan = row.querySelectorAll('td:nth-child(2) span[data-bytes]')[1];
+
+                            if (dailyUsageSpan && token.usage && token.usage.daily) {
+                                const dailyBytes = token.usage.daily.bytes || 0;
+                                dailyUsageSpan.setAttribute('data-bytes', dailyBytes);
+                                dailyUsageSpan.textContent = formatBytes(dailyBytes);
+                            }
+
+                            if (monthlyUsageSpan && token.usage && token.usage.monthly) {
+                                const monthlyBytes = token.usage.monthly.bytes || 0;
+                                monthlyUsageSpan.setAttribute('data-bytes', monthlyBytes);
+                                monthlyUsageSpan.textContent = formatBytes(monthlyBytes);
+                            }
+                        }
+                    });
+                }
+            }
+
+            await loadStreamStats();
+        } catch (error) {
+            console.error('Failed to refresh dashboard:', error);
+            showToast('Dashboard refresh failed.', 'error', 'Refresh failed');
+        } finally {
+            setTimeout(() => {
+                if (icon) icon.classList.remove('animate-spin');
+            }, 450);
+        }
+    }
+
+    function formatInitialBytes() {
+        document.querySelectorAll('[data-bytes]').forEach(el => {
+            const raw = el.getAttribute('data-bytes');
+            el.textContent = formatBytes(raw);
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const mobileLite = window.matchMedia('(max-width: 767px)').matches;
+        formatInitialBytes();
+        loadStreamStats();
+        setInterval(() => {
+            if (document.visibilityState === 'visible' && !window.__adminScrolling) loadStreamStats();
+        }, mobileLite ? 45000 : 30000);
+        setInterval(() => {
+            if (document.visibilityState === 'visible' && !window.__adminScrolling) refreshLiveDurations();
+        }, mobileLite ? 3000 : 1000);
+    });
+</script>
+{% endblock %}

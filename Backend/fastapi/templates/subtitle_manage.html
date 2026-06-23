@@ -1,0 +1,1500 @@
+{% extends "base.html" %}
+{% block title %}Subtitle Management - Telegram Stremio{% endblock %}
+
+{% block content %}
+
+<style>
+  .subtitle-page .glass-panel { overflow-wrap: anywhere; }
+  .subtitle-page table th,
+  .subtitle-page table td { vertical-align: middle; }
+  .subtitle-page .subtitle-tabs { scrollbar-width: none; }
+  .subtitle-page .subtitle-tabs::-webkit-scrollbar { display: none; }
+
+
+  /* Branded pickers replace Android's system select sheet. */
+  .subtitle-page .picker-trigger {
+    width: 100%;
+    min-height: 3.2rem;
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    padding: .7rem .9rem;
+    color: var(--text);
+    background: color-mix(in srgb, var(--bg) 78%, var(--card) 22%);
+    border: 1px solid color-mix(in srgb, var(--border) 88%, transparent);
+    border-radius: .95rem;
+    text-align: left;
+    font-size: .94rem;
+    font-weight: 750;
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+  }
+  .subtitle-page .picker-trigger:hover,
+  .subtitle-page .picker-trigger:focus-visible {
+    border-color: color-mix(in srgb, var(--primary) 62%, var(--border));
+    background: color-mix(in srgb, var(--primary) 9%, var(--card));
+    outline: none;
+  }
+  .subtitle-page .picker-trigger:active { transform: scale(.99); }
+  .subtitle-page .picker-trigger-icon {
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 26%, var(--border));
+    border-radius: .7rem;
+  }
+  .subtitle-page .picker-trigger-label { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .subtitle-page .picker-trigger-chevron { color: var(--text-secondary); transition: transform .16s ease; }
+  .subtitle-page .picker-trigger[aria-expanded="true"] .picker-trigger-chevron { transform: rotate(180deg); }
+
+  #choice-picker-modal .choice-picker-scrim {
+    background: rgba(2, 6, 23, .72);
+    backdrop-filter: blur(7px);
+    -webkit-backdrop-filter: blur(7px);
+  }
+  #choice-picker-modal .choice-picker-sheet {
+    width: min(100%, 32rem);
+    max-height: min(78dvh, 40rem);
+    display: flex;
+    flex-direction: column;
+    padding: 1.15rem;
+    border: 1px solid color-mix(in srgb, var(--border) 92%, rgba(255,255,255,.10));
+    border-radius: 1.55rem;
+    background: var(--card);
+    background: color-mix(in srgb, var(--card) 96%, var(--bg) 4%);
+    box-shadow: 0 28px 80px rgba(0,0,0,.48), 0 0 0 1px color-mix(in srgb, var(--primary) 8%, transparent) inset;
+  }
+  #choice-picker-modal .choice-picker-options {
+    display: grid;
+    gap: .45rem;
+    max-height: min(55dvh, 30rem);
+    overflow-y: auto;
+    padding: .15rem .1rem .15rem 0;
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in srgb, var(--primary) 44%, transparent) transparent;
+    -webkit-overflow-scrolling: touch;
+  }
+  #choice-picker-modal .choice-picker-options::-webkit-scrollbar { width: 6px; }
+  #choice-picker-modal .choice-picker-options::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--primary) 42%, transparent); border-radius: 999px; }
+  #choice-picker-modal .choice-option {
+    width: 100%;
+    min-height: 4rem;
+    display: flex;
+    align-items: center;
+    gap: .8rem;
+    padding: .72rem .8rem;
+    color: var(--text);
+    text-align: left;
+    border: 1px solid color-mix(in srgb, var(--border) 78%, transparent);
+    border-radius: 1rem;
+    background: color-mix(in srgb, var(--bg) 45%, transparent);
+    transition: border-color .16s ease, background .16s ease, transform .16s ease;
+  }
+  #choice-picker-modal .choice-option:hover,
+  #choice-picker-modal .choice-option:focus-visible {
+    outline: none;
+    border-color: color-mix(in srgb, var(--primary) 48%, var(--border));
+    background: color-mix(in srgb, var(--primary) 10%, var(--card));
+  }
+  #choice-picker-modal .choice-option:active { transform: scale(.992); }
+  #choice-picker-modal .choice-option.is-selected {
+    border-color: color-mix(in srgb, var(--primary) 64%, var(--border));
+    background: color-mix(in srgb, var(--primary) 16%, var(--card));
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--primary) 16%, transparent) inset;
+  }
+  #choice-picker-modal .choice-option-icon {
+    width: 2.4rem;
+    height: 2.4rem;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    background: color-mix(in srgb, var(--primary) 14%, transparent);
+    border: 1px solid color-mix(in srgb, var(--primary) 28%, var(--border));
+    border-radius: .8rem;
+  }
+  #choice-picker-modal .choice-option-name { font-size: .95rem; font-weight: 850; line-height: 1.2; }
+  #choice-picker-modal .choice-option-code { margin-top: .17rem; color: var(--text-secondary); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: .76rem; }
+  #choice-picker-modal .choice-option-check {
+    width: 1.55rem;
+    height: 1.55rem;
+    margin-left: auto;
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: transparent;
+    border: 2px solid color-mix(in srgb, var(--text-secondary) 68%, transparent);
+    border-radius: 999px;
+  }
+  #choice-picker-modal .choice-option.is-selected .choice-option-check {
+    color: var(--bg);
+    border-color: var(--primary);
+    background: var(--primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 17%, transparent);
+  }
+
+  @media (max-width: 640px) {
+    #choice-picker-modal { align-items: flex-end; padding: 0; }
+    #choice-picker-modal .choice-picker-sheet {
+      width: 100%;
+      max-height: min(80dvh, 44rem);
+      padding: 1rem;
+      border-radius: 1.45rem 1.45rem 0 0;
+      border-bottom: 0;
+    }
+    #choice-picker-modal .choice-picker-options { max-height: min(56dvh, 31rem); }
+  }
+
+  @media (max-width: 640px) {
+    .subtitle-page section,
+    .subtitle-page .glass-panel { border-radius: 1.35rem !important; }
+
+    .subtitle-page .tab-btn,
+    .subtitle-page .type-btn {
+      flex: 0 0 auto;
+      padding: .7rem .95rem;
+      font-size: .82rem;
+      white-space: nowrap;
+    }
+
+    .subtitle-page #media-header {
+      flex-wrap: wrap;
+      align-items: flex-start;
+      padding: 1rem !important;
+    }
+
+    .subtitle-page #media-header .ml-auto {
+      margin-left: 0 !important;
+      width: 100%;
+      display: grid;
+      grid-template-columns: 1fr auto;
+    }
+
+    .subtitle-page #ep-picker .flex,
+    .subtitle-page #src-telegram-fields .grid,
+    .subtitle-page #add-ep-override .flex {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      width: 100%;
+    }
+
+    .subtitle-page #ep-picker button,
+    .subtitle-page section button,
+    .subtitle-page #add-modal button,
+    .subtitle-page #edit-modal button,
+    .subtitle-page #delete-modal button {
+      min-height: 2.5rem;
+    }
+
+    .subtitle-page #add-modal > .relative,
+    .subtitle-page #edit-modal > .relative,
+    .subtitle-page #delete-modal > .relative {
+      padding: 1rem !important;
+      border-radius: 1.35rem !important;
+    }
+  }
+</style>
+<div class="subtitle-page w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
+
+  <!-- ── Header ──────────────────────────────────────────────── -->
+  <section class="glass-panel rounded-3xl p-5 sm:p-8 mb-6">
+    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+      <div>
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-white/10 bg-white/5 text-xs font-semibold text-text-secondary mb-3">
+          <i class="fa-solid fa-closed-captioning text-primary"></i>
+          Subtitle Control
+        </div>
+        <h1 class="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight text-text">
+          Subtitle Management
+        </h1>
+        <p class="mt-2 text-sm sm:text-base text-text-secondary max-w-2xl">
+          Search media to manage subtitles, or browse the full subtitle library.
+        </p>
+      </div>
+      <!-- Stats bar -->
+      <div class="flex flex-wrap gap-3">
+        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 min-w-[120px]">
+          <p class="text-[11px] uppercase tracking-wider text-text-secondary font-bold">Total</p>
+          <p id="stat-total" class="mt-1 text-sm font-semibold text-text">—</p>
+        </div>
+        <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 min-w-[120px]">
+          <p class="text-[11px] uppercase tracking-wider text-text-secondary font-bold">Loaded</p>
+          <p id="stat-count" class="mt-1 text-sm font-semibold text-text">—</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tab Bar ─────────────────────────────────────────────── -->
+  <div class="subtitle-tabs flex gap-2 mb-5 sm:mb-6 overflow-x-auto pb-1">
+    <button id="tab-search-btn" onclick="switchTab('search')"
+      class="tab-btn inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition border
+             bg-primary text-white border-primary shadow-lg shadow-primary/20">
+      <i class="fa-solid fa-magnifying-glass"></i> Search & Manage
+    </button>
+    <button id="tab-all-btn" onclick="switchTab('all')"
+      class="tab-btn inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-bold transition border
+             glass-panel text-text border-white/10 hover:bg-white/10">
+      <i class="fa-solid fa-list"></i> All Subtitles
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB: Search & Manage                                       -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div id="tab-search">
+
+    <!-- ── Search panel ──────────────────────────────────────── -->
+    <section class="glass-panel rounded-3xl p-4 sm:p-6 mb-6">
+      <div class="flex flex-col lg:flex-row gap-4 lg:items-end">
+        <!-- Media type toggle -->
+        <div class="flex gap-2 shrink-0">
+          <button id="btn-movie" onclick="setType('movie')"
+            class="type-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition border
+                   bg-primary text-white border-primary shadow-lg shadow-primary/20">
+            <i class="fa-solid fa-film"></i> Movies
+          </button>
+          <button id="btn-tv" onclick="setType('tv')"
+            class="type-btn inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold transition border
+                   glass-panel text-text border-white/10 hover:bg-white/10">
+            <i class="fa-solid fa-tv"></i> TV Shows
+          </button>
+        </div>
+        <!-- Search input -->
+        <div class="flex-1">
+          <label class="block text-xs font-bold uppercase tracking-wider text-text-secondary mb-2">Search title</label>
+          <div class="relative">
+            <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary text-sm"></i>
+            <input id="search-input" type="text" placeholder="e.g. Kara, Inception, Breaking Bad…"
+              class="w-full pl-11 pr-4 py-3 rounded-2xl bg-background text-text placeholder:text-text-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary/60 transition shadow-sm"
+              onkeydown="if(event.key==='Enter') searchMedia()">
+          </div>
+        </div>
+        <div class="flex gap-2 shrink-0 lg:pb-0 pb-1">
+          <button onclick="searchMedia()"
+            class="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-5 py-3 rounded-2xl transition font-bold shadow-lg shadow-primary/20">
+            <i class="fa-solid fa-magnifying-glass"></i> Search
+          </button>
+          <button onclick="clearAll()"
+            class="inline-flex items-center gap-2 glass-panel hover:bg-white/10 text-text px-5 py-3 rounded-2xl transition font-bold border border-white/10">
+            <i class="fa-solid fa-rotate-left"></i> Clear
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Search results (media picker) ─────────────────────── -->
+    <div id="results-section" class="hidden mb-6">
+      <h2 class="text-xs uppercase tracking-widest font-bold text-text-secondary mb-3 ml-1">Select a title</h2>
+      <div id="results-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3"></div>
+    </div>
+
+    <!-- ── Subtitle panel ─────────────────────────────────────── -->
+    <div id="sub-panel" class="hidden">
+
+      <!-- Selected media header -->
+      <div id="media-header" class="glass-panel rounded-3xl p-5 mb-6 flex gap-4 items-center">
+        <img id="media-poster" src="" alt="" class="w-14 h-20 rounded-xl object-cover shrink-0 shadow-lg">
+        <div class="min-w-0">
+          <p class="text-xs uppercase tracking-wider text-text-secondary font-bold mb-1">Selected</p>
+          <p id="media-title" class="text-lg font-extrabold text-text truncate"></p>
+          <p id="media-imdb" class="text-xs text-text-secondary mt-0.5 font-mono"></p>
+        </div>
+        <div class="ml-auto flex items-center gap-2 shrink-0">
+          <button onclick="openAddModal()"
+            class="inline-flex items-center gap-1.5 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-lg shadow-primary/20">
+            <i class="fa-solid fa-plus text-xs"></i> Add Subtitle
+          </button>
+          <button onclick="clearSelection()"
+            class="w-9 h-9 rounded-full glass-panel hover:bg-white/10 border border-white/10 flex items-center justify-center text-text-secondary hover:text-text transition">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- TV: season/episode picker -->
+      <div id="ep-picker" class="hidden glass-panel rounded-3xl p-5 mb-6">
+        <p class="text-xs uppercase tracking-wider font-bold text-text-secondary mb-3">Select Episode</p>
+        <div class="flex flex-wrap gap-3 items-end">
+          <div>
+            <label class="text-[11px] text-text-secondary font-bold block mb-1">Season</label>
+            <input id="inp-season" type="number" min="1" value="1"
+              class="w-24 px-3 py-2 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+          </div>
+          <div>
+            <label class="text-[11px] text-text-secondary font-bold block mb-1">Episode</label>
+            <input id="inp-episode" type="number" min="1" value="1"
+              class="w-24 px-3 py-2 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+          </div>
+          <button onclick="loadSubtitles()"
+            class="inline-flex items-center gap-2 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-xl text-sm font-bold transition shadow-lg shadow-primary/20">
+            <i class="fa-solid fa-rotate-right"></i> Load
+          </button>
+        </div>
+      </div>
+
+      <!-- Subtitle table -->
+      <section class="glass-panel rounded-3xl p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 class="font-extrabold text-text text-lg flex items-center gap-2">
+            <i class="fa-solid fa-list text-primary"></i>
+            Linked Subtitles
+            <span id="sub-count-badge" class="ml-2 text-xs font-bold px-2 py-0.5 rounded-full bg-primary/20 text-primary hidden"></span>
+          </h2>
+          <div class="text-xs text-text-secondary flex items-center gap-2 bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+            <i class="fa-solid fa-circle-info text-primary"></i>
+            Add via <span class="font-bold text-primary ml-1">+ Add Subtitle</span> or send <code class="font-mono text-primary mx-1">.srt/.vtt</code> to Telegram
+          </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="sub-loading" class="hidden text-center py-12">
+          <div class="inline-flex items-center justify-center w-12 h-12 rounded-full border border-white/10 glass-panel mb-3">
+            <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          </div>
+          <p class="text-text-secondary text-sm">Loading subtitles…</p>
+        </div>
+
+        <!-- Empty state -->
+        <div id="sub-empty" class="hidden text-center py-12">
+          <div class="w-16 h-16 rounded-full glass-panel flex items-center justify-center mx-auto mb-4 border border-white/10">
+            <i class="fa-solid fa-closed-captioning text-2xl text-text-secondary/40"></i>
+          </div>
+          <p class="text-text font-bold mb-1">No subtitles yet</p>
+          <p class="text-text-secondary text-sm mb-4">Use <strong class="text-primary">+ Add Subtitle</strong> above, or send a <code class="font-mono text-primary">.srt</code> file to your Telegram channel.</p>
+        </div>
+
+        <!-- Table -->
+        <div id="sub-table-wrap" class="hidden overflow-x-auto rounded-2xl border border-white/10">
+          <table class="w-full min-w-[720px] text-sm">
+            <thead>
+              <tr class="border-b border-white/10 bg-white/5 text-left">
+                <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Language</th>
+                <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Filename</th>
+                <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Format</th>
+                <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Source</th>
+                <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="sub-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+
+    <!-- ── Help card ─────────────────────────────────────────── -->
+    <section class="glass-panel rounded-3xl p-5 sm:p-6 mt-6">
+      <h3 class="font-extrabold text-text mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-circle-question text-primary"></i>
+        How to add subtitles
+      </h3>
+      <div class="grid sm:grid-cols-3 gap-4 text-sm">
+        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <p class="font-bold text-text mb-1"><i class="fa-solid fa-desktop mr-1 text-primary"></i> From Admin Panel</p>
+          <p class="text-text-secondary text-xs">Select a title, click <strong class="text-primary">+ Add Subtitle</strong>, and enter a Telegram message ID or a public subtitle URL. Stremio will show compact language badges only, like <code class="font-mono text-primary">si</code>, <code class="font-mono text-primary">en</code>, <code class="font-mono text-primary">ta</code>, <code class="font-mono text-primary">ar</code>.</p>
+        </div>
+        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <p class="font-bold text-text mb-1"><i class="fa-solid fa-robot mr-1 text-primary"></i> Auto-detect via Bot</p>
+          <p class="text-text-secondary text-xs">Send a <code class="text-primary">.srt</code> or <code class="text-primary">.vtt</code> file to the channel — the bot reads the caption first, then falls back to filename, and links automatically.</p>
+          <code class="block mt-2 text-[11px] font-mono text-primary bg-black/20 rounded-lg px-3 py-2 break-all">Kara_2026_Tamil_ESub.srt</code>
+        </div>
+        <div class="rounded-2xl bg-white/5 border border-white/10 p-4">
+          <p class="font-bold text-text mb-1"><i class="fa-solid fa-tv mr-1 text-primary"></i> TV episodes via Bot</p>
+          <p class="text-text-secondary text-xs">For TV episodes, include season and episode in the caption when sending to Telegram.</p>
+          <code class="block mt-2 text-[11px] font-mono text-primary bg-black/20 rounded-lg px-3 py-2">[SUB:tt1234567 S01E02 en]</code>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /tab-search -->
+
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <!-- TAB: All Subtitles                                         -->
+  <!-- ══════════════════════════════════════════════════════════ -->
+  <div id="tab-all" class="hidden">
+
+    <!-- Controls -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-5 items-start sm:items-center">
+      <div class="relative flex-1">
+        <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-text-secondary text-sm"></i>
+        <input id="all-filter" type="search" autocomplete="off" placeholder="Search all subtitles, titles, languages or filenames…"
+          class="w-full pl-11 pr-4 py-3 rounded-2xl bg-background text-text placeholder:text-text-secondary border border-border focus:outline-none focus:ring-2 focus:ring-primary/60 text-sm"
+          oninput="queueAllSubtitleSearch()">
+      </div>
+      <button onclick="loadAllSubtitles(allSubsPage || 1)"
+        class="inline-flex items-center gap-2 glass-panel hover:bg-white/10 text-text px-4 py-3 rounded-2xl text-sm font-bold border border-white/10 transition shrink-0">
+        <i class="fa-solid fa-rotate-right"></i> Refresh
+      </button>
+    </div>
+
+    <!-- Stats row -->
+    <div class="flex flex-wrap gap-3 mb-5" id="all-stats-row"></div>
+
+    <!-- Loading -->
+    <div id="all-loading" class="text-center py-20">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-full border border-white/10 glass-panel mb-3">
+        <div class="animate-spin rounded-full h-7 w-7 border-b-2 border-primary"></div>
+      </div>
+      <p class="text-text-secondary text-sm">Loading all subtitles…</p>
+    </div>
+
+    <!-- Table -->
+    <div id="all-table-wrap" class="hidden glass-panel rounded-3xl overflow-hidden border border-white/10">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[720px] text-sm">
+          <thead>
+            <tr class="border-b border-white/10 bg-white/5 text-left">
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Media</th>
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Language</th>
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Filename</th>
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Format</th>
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary">Type</th>
+              <th class="px-4 py-3 text-[11px] uppercase tracking-wider font-bold text-text-secondary text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="all-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div id="all-pagination" class="hidden mt-4 glass-panel rounded-2xl border border-white/10 px-3 sm:px-4 py-3 flex flex-col sm:flex-row gap-3 items-center justify-between">
+      <p id="all-page-status" class="text-xs sm:text-sm text-text-secondary text-center sm:text-left"></p>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button id="all-prev-btn" type="button" onclick="loadAllSubtitles(allSubsPage - 1)"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-sm font-bold text-text transition disabled:opacity-40 disabled:cursor-not-allowed">
+          <i class="fa-solid fa-chevron-left text-[10px]"></i> Previous
+        </button>
+        <span id="all-page-number" class="shrink-0 min-w-[92px] text-center text-xs font-bold text-text-secondary"></span>
+        <button id="all-next-btn" type="button" onclick="loadAllSubtitles(allSubsPage + 1)"
+          class="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-primary/30 bg-primary/10 hover:bg-primary hover:text-white text-sm font-bold text-primary transition disabled:opacity-40 disabled:cursor-not-allowed">
+          Next <i class="fa-solid fa-chevron-right text-[10px]"></i>
+        </button>
+      </div>
+    </div>
+
+    <div id="all-empty" class="hidden text-center py-20">
+      <div class="w-16 h-16 rounded-full glass-panel flex items-center justify-center mx-auto mb-4 border border-white/10">
+        <i class="fa-solid fa-closed-captioning text-2xl text-text-secondary/40"></i>
+      </div>
+      <p id="all-empty-message" class="text-text font-bold">No subtitles found in the database.</p>
+    </div>
+
+  </div><!-- /tab-all -->
+
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- Delete confirmation modal                                    -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeDeleteModal()"></div>
+  <div class="relative glass-panel rounded-3xl p-6 w-full max-w-sm z-10 shadow-2xl">
+    <div class="flex items-center gap-3 mb-4">
+      <div class="w-10 h-10 rounded-full bg-red-500/15 flex items-center justify-center shrink-0">
+        <i class="fa-solid fa-triangle-exclamation text-red-400"></i>
+      </div>
+      <div>
+        <p class="font-extrabold text-text">Delete Subtitle?</p>
+        <p class="text-xs text-text-secondary" id="delete-modal-lang"></p>
+      </div>
+    </div>
+    <p class="text-sm text-text-secondary mb-5">This subtitle will be removed immediately. It cannot be undone.</p>
+    <div class="flex gap-3">
+      <button onclick="closeDeleteModal()"
+        class="flex-1 py-2.5 rounded-xl glass-panel border border-white/10 text-text hover:bg-white/10 text-sm font-bold transition">Cancel</button>
+      <button id="delete-confirm-btn" onclick="confirmDelete()"
+        class="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-bold transition">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- Edit subtitle modal                                          -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeEditModal()"></div>
+  <div class="relative glass-panel rounded-3xl p-6 w-full max-w-md z-10 shadow-2xl">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+        <i class="fa-solid fa-pen text-primary"></i>
+      </div>
+      <div>
+        <p class="font-extrabold text-text">Edit Subtitle</p>
+        <p class="text-xs text-text-secondary font-mono" id="edit-modal-id"></p>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Language</label>
+        <input id="edit-lang" type="hidden" value="en">
+        <button id="edit-lang-trigger" type="button" class="picker-trigger" onclick="openChoicePicker('language', 'edit-lang')" aria-haspopup="dialog" aria-expanded="false">
+          <span class="picker-trigger-icon"><i class="fa-solid fa-language"></i></span>
+          <span id="edit-lang-label" class="picker-trigger-label">English (en)</span>
+          <i class="fa-solid fa-chevron-down picker-trigger-chevron"></i>
+        </button>
+      </div>
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Display Name</label>
+        <input id="edit-name" type="text" placeholder="e.g. Kara_2026_Tamil_ESub.srt"
+          class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeEditModal()"
+        class="flex-1 py-2.5 rounded-xl glass-panel border border-white/10 text-text hover:bg-white/10 text-sm font-bold transition">Cancel</button>
+      <button id="edit-confirm-btn" onclick="confirmEdit()"
+        class="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- Branded language / format picker                             -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<div id="choice-picker-modal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="choice-picker-title">
+  <div class="choice-picker-scrim absolute inset-0" onclick="closeChoicePicker()"></div>
+  <section class="choice-picker-sheet relative z-10">
+    <div class="flex items-start gap-3 pb-4">
+      <div id="choice-picker-icon-wrap" class="w-10 h-10 rounded-xl bg-primary/15 border border-primary/20 flex items-center justify-center shrink-0">
+        <i id="choice-picker-icon" class="fa-solid fa-language text-primary"></i>
+      </div>
+      <div class="min-w-0 flex-1">
+        <h2 id="choice-picker-title" class="font-extrabold text-text">Choose language</h2>
+        <p id="choice-picker-description" class="mt-0.5 text-xs text-text-secondary">Subtitle label shown in Stremio</p>
+      </div>
+      <button type="button" onclick="closeChoicePicker()" class="nav-icon-btn !w-9 !h-9 !rounded-xl shrink-0" aria-label="Close picker">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+    <div id="choice-picker-options" class="choice-picker-options" role="radiogroup" aria-label="Options"></div>
+    <p id="choice-picker-footer" class="mt-3 text-[11px] text-text-secondary flex items-center gap-1.5">
+      <i class="fa-solid fa-circle-info text-primary/80"></i>
+      Select one option to continue.
+    </p>
+  </section>
+</div>
+
+<!-- ─────────────────────────────────────────────────────────── -->
+<!-- Add Subtitle modal                                           -->
+<!-- ─────────────────────────────────────────────────────────── -->
+<div id="add-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+  <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeAddModal()"></div>
+  <div class="relative glass-panel rounded-3xl p-6 w-full max-w-lg z-10 shadow-2xl overflow-y-auto max-h-[90vh]">
+    <div class="flex items-center gap-3 mb-5">
+      <div class="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center shrink-0">
+        <i class="fa-solid fa-plus text-primary"></i>
+      </div>
+      <div>
+        <p class="font-extrabold text-text">Add Subtitle</p>
+        <p class="text-xs text-text-secondary" id="add-modal-for"></p>
+      </div>
+    </div>
+
+    <!-- Source type toggle -->
+    <div class="mb-4">
+      <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-2">Source Type</label>
+      <div class="flex gap-2">
+        <button id="src-tg-btn" onclick="setSourceType('telegram')"
+          class="src-btn flex-1 py-2 rounded-xl text-xs font-bold border transition
+                 bg-primary text-white border-primary">
+          <i class="fa-brands fa-telegram mr-1"></i> Telegram Message
+        </button>
+        <button id="src-url-btn" onclick="setSourceType('url')"
+          class="src-btn flex-1 py-2 rounded-xl text-xs font-bold border transition
+                 glass-panel text-text border-white/10 hover:bg-white/10">
+          <i class="fa-solid fa-link mr-1"></i> External URL
+        </button>
+      </div>
+    </div>
+
+    <div class="space-y-4">
+      <!-- Telegram source fields -->
+      <div id="src-telegram-fields">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Chat ID <span class="text-text-secondary/50">(without -100)</span></label>
+            <input id="add-chat-id" type="text" placeholder="e.g. 1234567890"
+              class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 font-mono">
+          </div>
+          <div>
+            <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Message ID</label>
+            <input id="add-msg-id" type="text" placeholder="e.g. 42"
+              class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 font-mono">
+          </div>
+        </div>
+        <p class="text-[11px] text-text-secondary mt-1.5 flex items-center gap-1">
+          <i class="fa-solid fa-circle-info text-primary/70"></i>
+          Right-click a message in Telegram Web → Copy Message Link to get the IDs.
+        </p>
+      </div>
+
+      <!-- URL source fields -->
+      <div id="src-url-fields" class="hidden">
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Public Subtitle URL</label>
+        <input id="add-url" type="url" placeholder="https://example.com/subtitle.srt"
+          class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60 font-mono">
+        <p class="text-[11px] text-text-secondary mt-1.5 flex items-center gap-1">
+          <i class="fa-solid fa-circle-info text-primary/70"></i>
+          Must be a direct publicly accessible link to an .srt or .vtt file.
+        </p>
+      </div>
+
+      <!-- Language -->
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Language</label>
+        <input id="add-lang" type="hidden" value="en">
+        <button id="add-lang-trigger" type="button" class="picker-trigger" onclick="openChoicePicker('language', 'add-lang')" aria-haspopup="dialog" aria-expanded="false">
+          <span class="picker-trigger-icon"><i class="fa-solid fa-language"></i></span>
+          <span id="add-lang-label" class="picker-trigger-label">English (en)</span>
+          <i class="fa-solid fa-chevron-down picker-trigger-chevron"></i>
+        </button>
+      </div>
+
+      <!-- Format -->
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Format</label>
+        <input id="add-fmt" type="hidden" value="srt">
+        <button id="add-fmt-trigger" type="button" class="picker-trigger" onclick="openChoicePicker('format', 'add-fmt')" aria-haspopup="dialog" aria-expanded="false">
+          <span class="picker-trigger-icon"><i class="fa-solid fa-file-code"></i></span>
+          <span id="add-fmt-label" class="picker-trigger-label">SRT</span>
+          <i class="fa-solid fa-chevron-down picker-trigger-chevron"></i>
+        </button>
+      </div>
+
+      <!-- Display name -->
+      <div>
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-1.5">Display Name <span class="text-text-secondary/50">(optional)</span></label>
+        <input id="add-name" type="text" placeholder="e.g. Kara_2026_Tamil_ESub.srt"
+          class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+      </div>
+
+      <!-- TV episode override -->
+      <div id="add-ep-override" class="hidden">
+        <label class="text-xs font-bold uppercase tracking-wider text-text-secondary block mb-2">Episode <span class="text-text-secondary/50">(leave blank to use current selection)</span></label>
+        <div class="flex gap-3">
+          <input id="add-season" type="number" min="1" placeholder="Season"
+            class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+          <input id="add-episode" type="number" min="1" placeholder="Episode"
+            class="w-full px-3 py-2.5 rounded-xl bg-background border border-border text-text text-sm focus:outline-none focus:ring-2 focus:ring-primary/60">
+        </div>
+      </div>
+    </div>
+
+    <div class="flex gap-3 mt-6">
+      <button onclick="closeAddModal()"
+        class="flex-1 py-2.5 rounded-xl glass-panel border border-white/10 text-text hover:bg-white/10 text-sm font-bold transition">Cancel</button>
+      <button id="add-confirm-btn" onclick="confirmAdd()"
+        class="flex-1 py-2.5 rounded-xl bg-primary hover:bg-primary/90 text-white text-sm font-bold transition">
+        <i class="fa-solid fa-plus mr-1"></i> Add Subtitle
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────────────────────
+const LANG_NAMES = {
+  en:'English', si:'Sinhala', ta:'Tamil', hi:'Hindi', fr:'French',
+  de:'German', es:'Spanish', ja:'Japanese', ko:'Korean', zh:'Chinese',
+  ar:'Arabic', pt:'Portuguese', ru:'Russian', it:'Italian', nl:'Dutch',
+  tr:'Turkish', te:'Telugu', ml:'Malayalam', kn:'Kannada',
+};
+function langIcon(lang) {
+  return `<span class="lang-icon"><i class="fa-solid fa-language"></i></span>`;
+}
+
+// ─────────────────────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────────────────────
+let mediaType    = 'movie';
+let selectedImdb = null;
+let selectedTitle = null;
+let pendingDelete = null;  // {imdbId, subId, lang, context:'search'|'all', allImdb?}
+let pendingEdit   = null;  // {imdbId, subId, season?, episode?}
+let addSourceType = 'telegram';
+const ALL_SUBTITLES_PER_PAGE = 50;
+let allSubsCache  = [];
+let allSubsPage   = 1;
+let allSubsTotal  = 0;
+let allSubsPages  = 1;
+let allSubsLoaded = false;
+let allSubsSearch = '';
+let allSubsSearchTimer = null;
+let allSubsRequestController = null;
+let currentTab    = 'search';
+
+// ─────────────────────────────────────────────────────────────
+// Tab switching
+// ─────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  ['search','all'].forEach(t => {
+    document.getElementById('tab-'+t).classList.toggle('hidden', t !== tab);
+    const btn = document.getElementById('tab-'+t+'-btn');
+    if (t === tab) {
+      btn.classList.replace('glass-panel','bg-primary');
+      btn.classList.replace('text-text','text-white');
+      btn.classList.replace('border-white/10','border-primary');
+      btn.classList.add('shadow-lg','shadow-primary/20');
+    } else {
+      btn.classList.replace('bg-primary','glass-panel');
+      btn.classList.replace('text-white','text-text');
+      btn.classList.replace('border-primary','border-white/10');
+      btn.classList.remove('shadow-lg','shadow-primary/20');
+    }
+  });
+  if (tab === 'all' && !allSubsLoaded) loadAllSubtitles(1);
+}
+
+// ─────────────────────────────────────────────────────────────
+// Media type toggle
+// ─────────────────────────────────────────────────────────────
+function setType(t) {
+  mediaType = t;
+  ['movie','tv'].forEach(x => {
+    const b = document.getElementById('btn-'+x);
+    if (x === t) {
+      b.classList.replace('glass-panel','bg-primary');
+      b.classList.replace('text-text','text-white');
+      b.classList.replace('border-white/10','border-primary');
+    } else {
+      b.classList.replace('bg-primary','glass-panel');
+      b.classList.replace('text-white','text-text');
+      b.classList.replace('border-primary','border-white/10');
+    }
+  });
+  clearAll();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Search media
+// ─────────────────────────────────────────────────────────────
+async function searchMedia() {
+  const q = document.getElementById('search-input').value.trim();
+  if (!q) return;
+  document.getElementById('results-section').classList.remove('hidden');
+  document.getElementById('sub-panel').classList.add('hidden');
+  document.getElementById('results-grid').innerHTML =
+    '<p class="col-span-full text-center text-text-secondary py-8 text-sm animate-pulse">Searching…</p>';
+
+  try {
+    const res  = await fetch(`/api/subtitles/search/media?q=${encodeURIComponent(q)}&media_type=${mediaType}`);
+    const data = await res.json();
+    renderResults(data.results || []);
+  } catch {
+    document.getElementById('results-grid').innerHTML =
+      '<p class="col-span-full text-center text-red-400 text-sm py-8">Search failed.</p>';
+  }
+}
+
+function renderResults(items) {
+  const grid = document.getElementById('results-grid');
+  if (!items.length) {
+    grid.innerHTML = '<p class="col-span-full text-center text-text-secondary py-8 text-sm">No results found.</p>';
+    return;
+  }
+  grid.innerHTML = items.map(m => `
+    <button onclick='selectMedia(${JSON.stringify(m)})'
+      class="glass-panel rounded-2xl p-2 border border-white/10 hover:border-primary/60 hover:shadow-lg hover:shadow-primary/10 transition text-left group">
+      <div class="relative">
+        <img src="${m.poster || '/static/no-poster.png'}" alt=""
+          class="w-full aspect-[2/3] rounded-xl object-cover mb-2 group-hover:opacity-90 transition">
+        ${m.imdb_id ? `<span class="absolute top-1.5 right-1.5 text-[9px] font-mono font-bold bg-black/70 text-white px-1.5 py-0.5 rounded-full">${m.imdb_id}</span>` : ''}
+      </div>
+      <p class="text-xs font-bold text-text truncate px-1">${escHtml(m.title)}</p>
+      <p class="text-[10px] text-text-secondary px-1">${m.release_year || ''}</p>
+    </button>
+  `).join('');
+}
+
+function selectMedia(m) {
+  selectedImdb  = m.imdb_id;
+  selectedTitle = m.title;
+
+  document.getElementById('media-poster').src = m.poster || '';
+  document.getElementById('media-title').textContent = m.title + (m.release_year ? ` (${m.release_year})` : '');
+  document.getElementById('media-imdb').textContent  = m.imdb_id || '';
+
+  const epPicker = document.getElementById('ep-picker');
+  mediaType === 'tv' ? epPicker.classList.remove('hidden') : epPicker.classList.add('hidden');
+
+  document.getElementById('results-section').classList.add('hidden');
+  document.getElementById('sub-panel').classList.remove('hidden');
+  document.getElementById('stat-count').textContent = '—';
+
+  loadSubtitles();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Load subtitles (search tab)
+// ─────────────────────────────────────────────────────────────
+async function loadSubtitles() {
+  if (!selectedImdb) return;
+  showSubLoading(true);
+
+  let url = `/api/subtitles/${selectedImdb}`;
+  if (mediaType === 'tv') {
+    const s = document.getElementById('inp-season').value;
+    const e = document.getElementById('inp-episode').value;
+    url += `?season=${s}&episode=${e}`;
+  }
+
+  try {
+    const res  = await fetch(url);
+    const data = await res.json();
+    renderSubtitles(data.subtitles || []);
+  } catch {
+    showToast('Failed to load subtitles.', 'error', 'Error');
+    showSubLoading(false);
+  }
+}
+
+function renderSubtitles(subs) {
+  showSubLoading(false);
+  const tbody = document.getElementById('sub-tbody');
+  const empty = document.getElementById('sub-empty');
+  const wrap  = document.getElementById('sub-table-wrap');
+  const badge = document.getElementById('sub-count-badge');
+
+  document.getElementById('stat-count').textContent = subs.length + ' subtitle' + (subs.length !== 1 ? 's' : '');
+
+  if (!subs.length) {
+    empty.classList.remove('hidden'); wrap.classList.add('hidden'); badge.classList.add('hidden'); return;
+  }
+  empty.classList.add('hidden'); wrap.classList.remove('hidden');
+  badge.textContent = subs.length; badge.classList.remove('hidden');
+
+  tbody.innerHTML = subs.map(s => subRow(s, selectedImdb, 'search')).join('');
+}
+
+function subRow(s, imdbId, context) {
+  const lang   = s.language || 'en';
+  const flag   = langIcon(lang);
+  const name   = LANG_NAMES[lang] || lang.toUpperCase();
+  const fmt    = (s.format || 'srt').toUpperCase();
+  const fname  = escHtml(s.name || '—');
+  const shortId = s.id ? s.id.slice(0,12)+'…' : '—';
+  const isUrl  = s.source_type === 'url';
+
+  const fmtColor = fmt === 'VTT' ? 'text-green-400 bg-green-500/10 border-green-500/30'
+                 : fmt === 'SRT' ? 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                 : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+  const srcBadge = isUrl
+    ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border text-cyan-400 bg-cyan-500/10 border-cyan-500/30"><i class="fa-solid fa-link mr-0.5"></i>URL</span>`
+    : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/30"><i class="fa-brands fa-telegram mr-0.5"></i>TG</span>`;
+
+  const currentSeason = context === 'search' && mediaType === 'tv'
+    ? positiveInteger(document.getElementById('inp-season').value)
+    : null;
+  const currentEpisode = context === 'search' && mediaType === 'tv'
+    ? positiveInteger(document.getElementById('inp-episode').value)
+    : null;
+  const editArgs = [imdbId, s.id, lang, s.name || '', context, currentSeason, currentEpisode]
+    .map(jsArg).join(',');
+  const delArgs = [s.id, lang, name, imdbId, context, currentSeason, currentEpisode]
+    .map(jsArg).join(',');
+
+  return `
+    <tr class="border-b border-white/5 hover:bg-white/5 transition">
+      <td class="px-4 py-3.5">
+        <span class="flex items-center gap-2 font-bold text-text">
+          ${flag}
+          <span>${name}</span>
+          <span class="text-[10px] font-mono text-text-secondary uppercase">${lang}</span>
+        </span>
+      </td>
+      <td class="px-4 py-3.5">
+        <span class="text-text-secondary text-xs font-mono break-all">${fname}</span>
+      </td>
+      <td class="px-4 py-3.5">
+        <span class="text-[11px] font-bold px-2 py-0.5 rounded-full border ${fmtColor}">${fmt}</span>
+      </td>
+      <td class="px-4 py-3.5">${srcBadge}</td>
+      <td class="px-4 py-3.5 text-right">
+        <div class="flex items-center gap-1.5 justify-end">
+          <button onclick="openEditModal(${editArgs})"
+            class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl
+                   bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/30 hover:border-primary transition">
+            <i class="fa-solid fa-pen text-[10px]"></i>
+          </button>
+          <button onclick="openDeleteModal(${delArgs})"
+            class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl
+                   bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 hover:border-red-500 transition">
+            <i class="fa-solid fa-trash-can text-[10px]"></i>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function showSubLoading(show) {
+  document.getElementById('sub-loading').classList.toggle('hidden', !show);
+  document.getElementById('sub-empty').classList.toggle('hidden', show);
+  document.getElementById('sub-table-wrap').classList.toggle('hidden', show);
+}
+
+// ─────────────────────────────────────────────────────────────
+// All Subtitles tab
+// ─────────────────────────────────────────────────────────────
+function getAllSubtitleSearch() {
+  return (document.getElementById('all-filter')?.value || '').trim();
+}
+
+function queueAllSubtitleSearch() {
+  window.clearTimeout(allSubsSearchTimer);
+  allSubsSearchTimer = window.setTimeout(() => {
+    loadAllSubtitles(1);
+  }, 260);
+}
+
+async function loadAllSubtitles(requestedPage = 1) {
+  const safePage = Math.max(1, Number.parseInt(requestedPage, 10) || 1);
+  const search = getAllSubtitleSearch();
+
+  if (allSubsRequestController) allSubsRequestController.abort();
+  const controller = new AbortController();
+  allSubsRequestController = controller;
+
+  document.getElementById('all-loading').classList.remove('hidden');
+  document.getElementById('all-table-wrap').classList.add('hidden');
+  document.getElementById('all-empty').classList.add('hidden');
+  document.getElementById('all-pagination').classList.add('hidden');
+
+  try {
+    const query = new URLSearchParams({ page: safePage, page_size: ALL_SUBTITLES_PER_PAGE });
+    if (search) query.set('q', search);
+    const res = await fetch(`/api/subtitles/all?${query.toString()}`, { signal: controller.signal });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.detail || 'Unable to load subtitles.');
+    if (controller.signal.aborted) return;
+
+    allSubsCache = data.subtitles || [];
+    allSubsPage = Math.max(1, Number.parseInt(data.page, 10) || safePage);
+    allSubsTotal = Math.max(0, Number.parseInt(data.total, 10) || 0);
+    allSubsPages = Math.max(1, Number.parseInt(data.total_pages, 10) || 1);
+    allSubsSearch = String(data.search || '');
+    allSubsLoaded = true;
+
+    document.getElementById('stat-total').textContent = allSubsSearch
+      ? `${allSubsTotal} match${allSubsTotal === 1 ? '' : 'es'}`
+      : `${allSubsTotal} total`;
+    renderAllStatsRow(data);
+    renderAllTable(allSubsCache);
+    updateAllPagination();
+  } catch (error) {
+    if (error?.name !== 'AbortError') showToast('Failed to load subtitle library.', 'error', 'Error');
+  } finally {
+    if (allSubsRequestController === controller) allSubsRequestController = null;
+    if (!controller.signal.aborted) document.getElementById('all-loading').classList.add('hidden');
+  }
+}
+
+function renderAllStatsRow(data) {
+  const byLang = data.language_counts || {};
+  const row = document.getElementById('all-stats-row');
+  const total = Math.max(0, Number.parseInt(data.total, 10) || 0);
+  const langs = Object.keys(byLang).length;
+  row.innerHTML = `
+    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5">
+      <p class="text-[10px] uppercase tracking-wider text-text-secondary font-bold">Total</p>
+      <p class="text-lg font-black text-text">${total}</p>
+    </div>
+    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5">
+      <p class="text-[10px] uppercase tracking-wider text-text-secondary font-bold">Languages</p>
+      <p class="text-lg font-black text-text">${langs}</p>
+    </div>
+    ${Object.entries(byLang).sort((a,b)=>b[1]-a[1]).slice(0,5).map(([l,c])=>`
+    <div class="rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 flex items-center gap-2">
+      ${langIcon(l)}
+      <div>
+        <p class="text-[10px] uppercase tracking-wider text-text-secondary font-bold">${LANG_NAMES[l]||l.toUpperCase()}</p>
+        <p class="text-sm font-black text-text">${c}</p>
+      </div>
+    </div>`).join('')}
+  `;
+}
+
+function updateAllPagination() {
+  const pager = document.getElementById('all-pagination');
+  const status = document.getElementById('all-page-status');
+  const pageNumber = document.getElementById('all-page-number');
+  const previous = document.getElementById('all-prev-btn');
+  const next = document.getElementById('all-next-btn');
+
+  if (!allSubsTotal) {
+    pager.classList.add('hidden');
+    return;
+  }
+
+  const start = ((allSubsPage - 1) * ALL_SUBTITLES_PER_PAGE) + 1;
+  const end = Math.min(allSubsPage * ALL_SUBTITLES_PER_PAGE, allSubsTotal);
+  status.textContent = allSubsSearch
+    ? `Showing ${start}–${end} of ${allSubsTotal} results for “${allSubsSearch}”`
+    : `Showing ${start}–${end} of ${allSubsTotal} subtitles`;
+  pageNumber.textContent = `Page ${allSubsPage} / ${allSubsPages}`;
+  previous.disabled = allSubsPage <= 1;
+  next.disabled = allSubsPage >= allSubsPages;
+  pager.classList.remove('hidden');
+  document.getElementById('stat-count').textContent = `${start}–${end} shown`;
+}
+
+function renderAllTable(subs) {
+  const tbody = document.getElementById('all-tbody');
+  const wrap  = document.getElementById('all-table-wrap');
+  const empty = document.getElementById('all-empty');
+  const emptyMessage = document.getElementById('all-empty-message');
+
+  if (!subs.length) {
+    if (emptyMessage) {
+      emptyMessage.textContent = allSubsSearch
+        ? `No subtitles match “${allSubsSearch}”.`
+        : 'No subtitles found in the database.';
+    }
+    empty.classList.remove('hidden');
+    wrap.classList.add('hidden');
+    return;
+  }
+  empty.classList.add('hidden'); wrap.classList.remove('hidden');
+
+  tbody.innerHTML = subs.map(s => {
+    const lang   = s.language||'en';
+    const flag   = langIcon(lang);
+    const lname  = LANG_NAMES[lang]||lang.toUpperCase();
+    const fmt    = (s.format||'srt').toUpperCase();
+    const fname  = escHtml(s.name||'—');
+    const title  = escHtml(s.media_title||s.imdb_id||'—');
+    const isUrl  = s.source_type === 'url';
+
+    const fmtColor = fmt==='VTT' ? 'text-green-400 bg-green-500/10 border-green-500/30'
+                   : fmt==='SRT' ? 'text-blue-400 bg-blue-500/10 border-blue-500/30'
+                   : 'text-amber-400 bg-amber-500/10 border-amber-500/30';
+
+    const srcBadge = isUrl
+      ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border text-cyan-400 bg-cyan-500/10 border-cyan-500/30"><i class="fa-solid fa-link mr-0.5"></i>URL</span>`
+      : `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full border text-violet-400 bg-violet-500/10 border-violet-500/30"><i class="fa-brands fa-telegram mr-0.5"></i>TG</span>`;
+
+    const editArgs = [s.imdb_id, s.id, lang, s.name || '', 'all', s.season, s.episode]
+      .map(jsArg).join(',');
+    const delArgs = [s.id, lang, lname, s.imdb_id, 'all', s.season, s.episode]
+      .map(jsArg).join(',');
+
+    return `
+    <tr class="border-b border-white/5 hover:bg-white/5 transition all-row"
+        data-search="${lang} ${lname} ${fname} ${title} ${s.imdb_id||''} ${fmt}">
+      <td class="px-4 py-3.5">
+        <div class="flex items-center gap-2">
+          ${s.media_poster ? `<img src="${escHtml(s.media_poster)}" class="w-7 h-10 rounded object-cover shrink-0">` : ''}
+          <div class="min-w-0">
+            <p class="text-xs font-bold text-text truncate">${title}</p>
+            <p class="text-[10px] font-mono text-text-secondary">${escHtml(s.imdb_id||'')}</p>
+          </div>
+        </div>
+      </td>
+      <td class="px-4 py-3.5">
+        <span class="flex items-center gap-1.5">
+          ${flag}
+          <span class="text-xs font-bold text-text">${lname}</span>
+          <span class="text-[10px] font-mono text-text-secondary">${lang}</span>
+        </span>
+      </td>
+      <td class="px-4 py-3.5"><span class="text-xs font-mono text-text-secondary break-all">${fname}</span></td>
+      <td class="px-4 py-3.5"><span class="text-[11px] font-bold px-2 py-0.5 rounded-full border ${fmtColor}">${fmt}</span></td>
+      <td class="px-4 py-3.5">${srcBadge}</td>
+      <td class="px-4 py-3.5 text-right">
+        <div class="flex items-center gap-1.5 justify-end">
+          <button onclick="openEditModal(${editArgs})"
+            class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl
+                   bg-primary/10 hover:bg-primary text-primary hover:text-white border border-primary/30 hover:border-primary transition">
+            <i class="fa-solid fa-pen text-[10px]"></i>
+          </button>
+          <button onclick="openDeleteModal(${delArgs})"
+            class="inline-flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl
+                   bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white border border-red-500/30 hover:border-red-500 transition">
+            <i class="fa-solid fa-trash-can text-[10px]"></i>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function filterAllTable() {
+  // Kept for backward compatibility with older inline calls. Search is now
+  // server-side, so it includes every subtitle record instead of only this page.
+  queueAllSubtitleSearch();
+}
+
+// ─────────────────────────────────────────────────────────────
+// Branded language / format picker
+// ─────────────────────────────────────────────────────────────
+const CHOICE_PICKERS = {
+  language: {
+    title: 'Choose language',
+    description: 'Subtitle label shown in Stremio',
+    icon: 'fa-language',
+    footer: 'Select the subtitle language.',
+    options: [
+      { value:'en', label:'English (en)', name:'English', code:'en' },
+      { value:'si', label:'Sinhala (si)', name:'Sinhala', code:'si' },
+      { value:'ta', label:'Tamil (ta)', name:'Tamil', code:'ta' },
+      { value:'hi', label:'Hindi (hi)', name:'Hindi', code:'hi' },
+      { value:'fr', label:'French (fr)', name:'French', code:'fr' },
+      { value:'de', label:'German (de)', name:'German', code:'de' },
+      { value:'es', label:'Spanish (es)', name:'Spanish', code:'es' },
+      { value:'ja', label:'Japanese (ja)', name:'Japanese', code:'ja' },
+      { value:'ko', label:'Korean (ko)', name:'Korean', code:'ko' },
+      { value:'zh', label:'Chinese (zh)', name:'Chinese', code:'zh' },
+      { value:'ar', label:'Arabic (ar)', name:'Arabic', code:'ar' },
+      { value:'pt', label:'Portuguese (pt)', name:'Portuguese', code:'pt' },
+      { value:'ru', label:'Russian (ru)', name:'Russian', code:'ru' },
+      { value:'it', label:'Italian (it)', name:'Italian', code:'it' },
+      { value:'nl', label:'Dutch (nl)', name:'Dutch', code:'nl' },
+      { value:'tr', label:'Turkish (tr)', name:'Turkish', code:'tr' },
+      { value:'te', label:'Telugu (te)', name:'Telugu', code:'te' },
+      { value:'ml', label:'Malayalam (ml)', name:'Malayalam', code:'ml' },
+      { value:'kn', label:'Kannada (kn)', name:'Kannada', code:'kn' },
+    ]
+  },
+  format: {
+    title: 'Choose format',
+    description: 'Subtitle file format',
+    icon: 'fa-file-code',
+    footer: 'Choose the format used by the subtitle file.',
+    options: [
+      { value:'srt', label:'SRT', name:'SRT', code:'SubRip subtitle' },
+      { value:'vtt', label:'VTT', name:'VTT', code:'WebVTT subtitle' },
+      { value:'ass', label:'ASS / SSA', name:'ASS / SSA', code:'Advanced SubStation Alpha' },
+    ]
+  }
+};
+let activeChoicePicker = null;
+
+function pickerConfigForField(fieldId) {
+  return fieldId.endsWith('-fmt') ? CHOICE_PICKERS.format : CHOICE_PICKERS.language;
+}
+function pickerOptionForValue(config, value) {
+  return config.options.find(option => option.value === value) || config.options[0];
+}
+function setPickerValue(fieldId, value) {
+  const input = document.getElementById(fieldId);
+  const config = pickerConfigForField(fieldId);
+  const option = pickerOptionForValue(config, value);
+  input.value = option.value;
+  const label = document.getElementById(`${fieldId}-label`);
+  const trigger = document.getElementById(`${fieldId}-trigger`);
+  if (label) label.textContent = option.label;
+  if (trigger) trigger.setAttribute('aria-label', `${config.title}: ${option.label}`);
+}
+function openChoicePicker(kind, fieldId) {
+  const config = CHOICE_PICKERS[kind];
+  if (!config || !document.getElementById(fieldId)) return;
+  activeChoicePicker = { kind, fieldId };
+  document.getElementById('choice-picker-title').textContent = config.title;
+  document.getElementById('choice-picker-description').textContent = config.description;
+  document.getElementById('choice-picker-footer').innerHTML = `<i class="fa-solid fa-circle-info text-primary/80"></i>${config.footer}`;
+  document.getElementById('choice-picker-icon').className = `fa-solid ${config.icon} text-primary`;
+  renderChoicePickerOptions();
+  document.getElementById(`${fieldId}-trigger`).setAttribute('aria-expanded', 'true');
+  document.getElementById('choice-picker-modal').classList.remove('hidden');
+}
+function renderChoicePickerOptions() {
+  if (!activeChoicePicker) return;
+  const { kind, fieldId } = activeChoicePicker;
+  const config = CHOICE_PICKERS[kind];
+  const selectedValue = document.getElementById(fieldId).value;
+  document.getElementById('choice-picker-options').innerHTML = config.options.map(option => {
+    const selected = option.value === selectedValue;
+    return `<button type="button" class="choice-option${selected ? ' is-selected' : ''}" role="radio" aria-checked="${selected}" onclick="choosePickerOption('${option.value}')">
+      <span class="choice-option-icon"><i class="fa-solid ${kind === 'language' ? 'fa-language' : 'fa-file-code'}"></i></span>
+      <span class="min-w-0 flex-1">
+        <span class="choice-option-name block">${option.name}</span>
+        <span class="choice-option-code block">${option.code}</span>
+      </span>
+      <span class="choice-option-check"><i class="fa-solid fa-check text-[10px]"></i></span>
+    </button>`;
+  }).join('');
+}
+function choosePickerOption(value) {
+  if (!activeChoicePicker) return;
+  setPickerValue(activeChoicePicker.fieldId, value);
+  closeChoicePicker();
+}
+function closeChoicePicker() {
+  if (activeChoicePicker) {
+    const trigger = document.getElementById(`${activeChoicePicker.fieldId}-trigger`);
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+  }
+  document.getElementById('choice-picker-modal').classList.add('hidden');
+  activeChoicePicker = null;
+}
+
+// ─────────────────────────────────────────────────────────────
+// Add Subtitle modal
+// ─────────────────────────────────────────────────────────────
+function openAddModal() {
+  if (!selectedImdb) return;
+  document.getElementById('add-modal-for').textContent = `For: ${selectedTitle} (${selectedImdb})`;
+  document.getElementById('add-season').value  = mediaType==='tv' ? (document.getElementById('inp-season').value||'') : '';
+  document.getElementById('add-episode').value = mediaType==='tv' ? (document.getElementById('inp-episode').value||'') : '';
+  document.getElementById('add-ep-override').classList.toggle('hidden', mediaType !== 'tv');
+  document.getElementById('add-chat-id').value = '';
+  document.getElementById('add-msg-id').value  = '';
+  document.getElementById('add-url').value     = '';
+  document.getElementById('add-name').value    = '';
+  setPickerValue('add-lang', 'en');
+  setPickerValue('add-fmt', 'srt');
+  setSourceType('telegram');
+  document.getElementById('add-modal').classList.remove('hidden');
+}
+function closeAddModal() { document.getElementById('add-modal').classList.add('hidden'); }
+
+function setSourceType(t) {
+  addSourceType = t;
+  document.getElementById('src-telegram-fields').classList.toggle('hidden', t !== 'telegram');
+  document.getElementById('src-url-fields').classList.toggle('hidden', t !== 'url');
+  const tgBtn  = document.getElementById('src-tg-btn');
+  const urlBtn = document.getElementById('src-url-btn');
+  if (t === 'telegram') {
+    tgBtn.className  = tgBtn.className.replace('glass-panel text-text border-white/10','') + ' bg-primary text-white border-primary';
+    urlBtn.className = urlBtn.className.replace('bg-primary text-white border-primary','') + ' glass-panel text-text border-white/10';
+  } else {
+    urlBtn.className = urlBtn.className.replace('glass-panel text-text border-white/10','') + ' bg-primary text-white border-primary';
+    tgBtn.className  = tgBtn.className.replace('bg-primary text-white border-primary','') + ' glass-panel text-text border-white/10';
+  }
+}
+
+async function confirmAdd() {
+  if (!selectedImdb) return;
+  const btn = document.getElementById('add-confirm-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-1"></i> Adding…';
+
+  const lang  = document.getElementById('add-lang').value;
+  const fmt   = document.getElementById('add-fmt').value;
+  const dname = document.getElementById('add-name').value.trim();
+  const sVal  = document.getElementById('add-season').value;
+  const eVal  = document.getElementById('add-episode').value;
+
+  const body = { language: lang, format: fmt, name: dname };
+  if (mediaType === 'tv' && sVal && eVal) { body.season = parseInt(sVal); body.episode = parseInt(eVal); }
+
+  if (addSourceType === 'telegram') {
+    const chatId = document.getElementById('add-chat-id').value.trim();
+    const msgId  = document.getElementById('add-msg-id').value.trim();
+    if (!chatId || !msgId) { showToast('Please enter Chat ID and Message ID.','error','Error'); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus mr-1"></i> Add Subtitle'; return; }
+    body.chat_id = chatId; body.msg_id = msgId;
+  } else {
+    const url = document.getElementById('add-url').value.trim();
+    if (!url) { showToast('Please enter a subtitle URL.','error','Error'); btn.disabled=false; btn.innerHTML='<i class="fa-solid fa-plus mr-1"></i> Add Subtitle'; return; }
+    body.url = url;
+  }
+
+  try {
+    const res  = await fetch(`/api/subtitles/${selectedImdb}`, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || 'Subtitle added!', 'success', 'Done');
+      closeAddModal();
+      loadSubtitles();
+      allSubsCache = [];
+      allSubsLoaded = false; // invalidate paged cache
+    } else {
+      showToast(data.detail || 'Failed to add subtitle.', 'error', 'Error');
+    }
+  } catch {
+    showToast('Network error.', 'error', 'Error');
+  }
+
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-plus mr-1"></i> Add Subtitle';
+}
+
+// ─────────────────────────────────────────────────────────────
+// Edit modal
+// ─────────────────────────────────────────────────────────────
+function openEditModal(imdbId, subId, lang, name, context, season = null, episode = null) {
+  pendingEdit = {
+    imdbId: String(imdbId || ''),
+    subId: String(subId || ''),
+    context,
+    season: positiveInteger(season),
+    episode: positiveInteger(episode),
+  };
+  document.getElementById('edit-modal-id').textContent = String(subId || '').slice(0,18)+'…';
+  setPickerValue('edit-lang', lang || 'en');
+  document.getElementById('edit-name').value = name || '';
+  document.getElementById('edit-modal').classList.remove('hidden');
+}
+function closeEditModal() { document.getElementById('edit-modal').classList.add('hidden'); pendingEdit=null; }
+
+async function confirmEdit() {
+  if (!pendingEdit) return;
+  const btn  = document.getElementById('edit-confirm-btn');
+  const edit = { ...pendingEdit }; // closeEditModal() clears global state.
+  btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin mr-1"></i> Saving…';
+
+  const lang = document.getElementById('edit-lang').value;
+  const name = document.getElementById('edit-name').value.trim();
+  const body = { language: lang, name };
+
+  // All Subtitles supplies its stored episode target. Search & Manage uses the
+  // current picker when it is a TV show.
+  if (edit.season && edit.episode) {
+    body.season = edit.season;
+    body.episode = edit.episode;
+  } else if (edit.context === 'search' && mediaType === 'tv') {
+    const season = positiveInteger(document.getElementById('inp-season').value);
+    const episode = positiveInteger(document.getElementById('inp-episode').value);
+    if (season && episode) { body.season = season; body.episode = episode; }
+  }
+
+  try {
+    const res  = await fetch(`/api/subtitles/${encodeURIComponent(edit.imdbId)}/${encodeURIComponent(edit.subId)}`, {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || 'Subtitle updated.', 'success', 'Done');
+      closeEditModal();
+      if (edit.context === 'search') await loadSubtitles();
+      else { allSubsCache=[]; allSubsLoaded=false; await loadAllSubtitles(allSubsPage); }
+    } else {
+      showToast(data.detail || 'Update failed.', 'error', 'Error');
+    }
+  } catch { showToast('Network error.', 'error', 'Error'); }
+
+  btn.disabled=false; btn.innerHTML='Save';
+}
+
+// ─────────────────────────────────────────────────────────────
+// Delete modal
+// ─────────────────────────────────────────────────────────────
+function openDeleteModal(subId, lang, langName, imdbId, context, season = null, episode = null) {
+  pendingDelete = {
+    subId: String(subId || ''),
+    lang,
+    imdbId: String(imdbId || ''),
+    context,
+    season: positiveInteger(season),
+    episode: positiveInteger(episode),
+  };
+  document.getElementById('delete-modal-lang').textContent = `Language: ${langName} (${lang})`;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); pendingDelete=null; }
+
+async function confirmDelete() {
+  if (!pendingDelete) return;
+  const btn = document.getElementById('delete-confirm-btn');
+  btn.disabled=true; btn.innerHTML='<i class="fa-solid fa-spinner animate-spin mr-1"></i> Deleting…';
+
+  const deleted = { ...pendingDelete };
+  let url = `/api/subtitles/${encodeURIComponent(deleted.imdbId)}/${encodeURIComponent(deleted.subId)}`;
+  const params = new URLSearchParams();
+  if (deleted.season && deleted.episode) {
+    params.set('season', deleted.season);
+    params.set('episode', deleted.episode);
+  } else if (deleted.context === 'search' && mediaType === 'tv') {
+    const season = positiveInteger(document.getElementById('inp-season').value);
+    const episode = positiveInteger(document.getElementById('inp-episode').value);
+    if (season && episode) { params.set('season', season); params.set('episode', episode); }
+  }
+  if (params.size) url += `?${params.toString()}`;
+
+  try {
+    const res  = await fetch(url, { method: 'DELETE' });
+    const data = await res.json();
+    if (res.ok) {
+      showToast(data.message || 'Subtitle deleted.', 'success', 'Done');
+      closeDeleteModal();
+      if (deleted.context === 'search') await loadSubtitles();
+      else { allSubsCache=[]; allSubsLoaded=false; await loadAllSubtitles(allSubsPage); }
+    } else {
+      showToast(data.detail || 'Delete failed.', 'error', 'Error');
+    }
+  } catch { showToast('Network error.', 'error', 'Error'); }
+
+  btn.disabled=false; btn.innerHTML='Delete';
+}
+
+// ─────────────────────────────────────────────────────────────
+// Utility
+// ─────────────────────────────────────────────────────────────
+function clearAll() {
+  document.getElementById('search-input').value='';
+  document.getElementById('results-section').classList.add('hidden');
+  document.getElementById('sub-panel').classList.add('hidden');
+  selectedImdb=null; document.getElementById('stat-count').textContent='—';
+}
+function clearSelection() {
+  document.getElementById('sub-panel').classList.add('hidden');
+  document.getElementById('results-section').classList.add('hidden');
+  selectedImdb=null; document.getElementById('stat-count').textContent='—';
+}
+function positiveInteger(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+// Inline handlers must survive apostrophes, ampersands and non-English names in
+// legacy Telegram subtitles. JSON + HTML escaping keeps the generated markup safe.
+function jsArg(value) {
+  return JSON.stringify(value ?? null)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function escHtml(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  const picker = document.getElementById('choice-picker-modal');
+  if (picker && !picker.classList.contains('hidden')) {
+    closeChoicePicker();
+    return;
+  }
+  closeDeleteModal();
+  closeEditModal();
+  closeAddModal();
+});
+
+// Media Management can open this page directly on the exact movie/TV title.
+// This preserves the normal picker while making the "Edit Subs" card button useful.
+document.addEventListener('DOMContentLoaded', () => {
+  const p = new URLSearchParams(window.location.search);
+  const imdbId = (p.get('imdb_id') || '').trim();
+  if (!imdbId) return;
+
+  const requestedType = p.get('media_type') === 'tv' ? 'tv' : 'movie';
+  setType(requestedType);
+  const season = Number.parseInt(p.get('season') || '', 10);
+  const episode = Number.parseInt(p.get('episode') || '', 10);
+  if (requestedType === 'tv') {
+    if (Number.isFinite(season) && season > 0) document.getElementById('inp-season').value = season;
+    if (Number.isFinite(episode) && episode > 0) document.getElementById('inp-episode').value = episode;
+  }
+
+  selectMedia({
+    imdb_id: imdbId,
+    title: p.get('title') || 'Selected media',
+    release_year: p.get('year') || '',
+    poster: p.get('poster') || '',
+  });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,34 @@
+<svg width="1280" height="420" viewBox="0 0 1280 420" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1280" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#050A18"/>
+      <stop offset="0.45" stop-color="#071B2F"/>
+      <stop offset="1" stop-color="#09111F"/>
+    </linearGradient>
+    <linearGradient id="cyan" x1="0" y1="0" x2="1280" y2="420" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#14F1FF"/>
+      <stop offset="0.5" stop-color="#1A7CFF"/>
+      <stop offset="1" stop-color="#7C3CFF"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="9" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="1280" height="420" rx="36" fill="url(#bg)"/>
+  <rect x="18" y="18" width="1244" height="384" rx="30" stroke="url(#cyan)" stroke-width="3" opacity="0.85"/>
+  <circle cx="1110" cy="80" r="170" fill="#0DDCFF" opacity="0.08"/>
+  <circle cx="1020" cy="360" r="220" fill="#7C3CFF" opacity="0.08"/>
+  <path d="M170 132H312C334.091 132 352 149.909 352 172V288C352 310.091 334.091 328 312 328H170C147.909 328 130 310.091 130 288V172C130 149.909 147.909 132 170 132Z" fill="#0B2342" stroke="#18E9FF" stroke-width="6" filter="url(#glow)"/>
+  <path d="M210 193L286 230L210 267V193Z" fill="url(#cyan)" filter="url(#glow)"/>
+  <path d="M305 168L398 225L305 282L323 231L305 168Z" fill="#E7FBFF" opacity="0.96"/>
+  <path d="M305 168L398 225L305 282L326 230L305 168Z" stroke="#18E9FF" stroke-width="3"/>
+  <text x="455" y="160" fill="#EAF7FF" font-family="Arial, Helvetica, sans-serif" font-size="54" font-weight="800" letter-spacing="2">TG STREMIO</text>
+  <text x="455" y="224" fill="#19E8FF" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" letter-spacing="8">TELEGRAM MEDIA ADDON</text>
+  <text x="455" y="278" fill="#B8C7D9" font-family="Arial, Helvetica, sans-serif" font-size="26">⚡ Stremio streams • 🤖 Telegram bots • 🗂️ Topic library • 🎞️ Movies • 📺 Series • 💬 Subtitles</text>
+  <rect x="455" y="310" width="560" height="46" rx="23" fill="#0B2342" stroke="#18E9FF" opacity="0.95"/>
+  <text x="485" y="341" fill="#EAF7FF" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="700">🚀 Docker • Hugging Face Spaces • FastAPI • MongoDB</text>
+</svg>

@@ -1,0 +1,40 @@
+# Python cache / bytecode
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environments
+.venv/
+venv/
+.env/
+
+# Environment / secrets
+.env
+config.env
+sample_config.local.env
+
+# Logs / generated files
+*.log
+log.txt
+media/
+*.strm
+
+# Telegram session files
+*.session
+*.session-journal
+*.session-shm
+*.session-wal
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Tool caches
+.cache/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/

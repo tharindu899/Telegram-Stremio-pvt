@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Stremio Guide - Telegram Stremio{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto py-6 sm:py-10 space-y-5">
+  <section class="glass-panel rounded-3xl p-5 sm:p-8">
+    <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-bold text-text-secondary mb-3">
+      <i class="fa-solid fa-puzzle-piece text-primary"></i> Setup Guide
+    </div>
+    <h1 class="text-2xl sm:text-4xl font-black tracking-tight text-text">Install your Stremio add-on</h1>
+    <p class="text-sm sm:text-base text-text-secondary mt-2 max-w-3xl">Use an access token manifest URL from the admin panel, then install it in Stremio as a custom add-on.</p>
+  </section>
+
+  <section class="grid md:grid-cols-3 gap-4">
+    <div class="glass-panel rounded-3xl p-5">
+      <div class="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-3"><i class="fa-solid fa-key"></i></div>
+      <h2 class="font-black text-text">1. Create token</h2>
+      <p class="text-sm text-text-secondary mt-2">Open Access Management or Dashboard and create/copy a manifest link.</p>
+    </div>
+    <div class="glass-panel rounded-3xl p-5">
+      <div class="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-3"><i class="fa-solid fa-link"></i></div>
+      <h2 class="font-black text-text">2. Paste manifest</h2>
+      <p class="text-sm text-text-secondary mt-2">In Stremio, add a custom add-on and paste the copied manifest URL.</p>
+    </div>
+    <div class="glass-panel rounded-3xl p-5">
+      <div class="w-10 h-10 rounded-2xl bg-primary/15 text-primary flex items-center justify-center mb-3"><i class="fa-solid fa-play"></i></div>
+      <h2 class="font-black text-text">3. Stream</h2>
+      <p class="text-sm text-text-secondary mt-2">Browse your Telegram-backed catalog and choose a quality to stream.</p>
+    </div>
+  </section>
+
+  <div class="flex flex-col sm:flex-row gap-3">
+    {% if is_authenticated %}
+    <a href="/admin/access" class="inline-flex justify-center items-center gap-2 rounded-2xl bg-primary text-background font-bold px-5 py-3">Open Access Page</a>
+    {% else %}
+    <a href="/login" class="inline-flex justify-center items-center gap-2 rounded-2xl bg-primary text-background font-bold px-5 py-3">Admin Login</a>
+    {% endif %}
+    <a href="/status" class="inline-flex justify-center items-center gap-2 rounded-2xl glass-panel border border-white/10 text-text font-bold px-5 py-3">View Status</a>
+  </div>
+</div>
+{% endblock %}
