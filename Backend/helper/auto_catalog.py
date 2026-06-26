@@ -6,6 +6,7 @@ import httpx
 
 from Backend.config import Telegram
 from Backend.logger import LOGGER
+from Backend.helper.media_types import canonical_media_type
 
 # -----------------------------
 # Auto catalog settings
@@ -105,7 +106,7 @@ def _tmdb_api_key() -> str:
 
 
 def _media_type(doc: dict) -> str:
-    return "tv" if doc.get("media_type") in ["tv", "series"] else "movie"
+    return canonical_media_type(doc.get("media_type"))
 
 
 def _catalog_key(name: str) -> str:

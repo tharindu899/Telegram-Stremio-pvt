@@ -7,6 +7,7 @@ import PTN
 import re
 from datetime import datetime, timezone, timedelta
 from Backend.fastapi.security.tokens import verify_token
+from Backend.helper.media_types import canonical_media_type, stremio_media_type
 
 
 # --- Configuration ---
@@ -38,7 +39,7 @@ def format_released_date(media):
 
 # --- Helper Functions ---
 def convert_to_stremio_meta(item: dict) -> dict:
-    media_type = "series" if item.get("media_type") == "tv" else "movie"
+    media_type = stremio_media_type(item.get("media_type"))
     
     meta = {
         "id": item.get('imdb_id'),
@@ -829,7 +830,7 @@ async def get_meta(token: str, media_type: str, id: str, token_data: dict = Depe
 
     meta_obj = {
         "id": id,
-        "type": "series" if media.get("media_type") == "tv" else "movie",
+        "type": stremio_media_type(media.get("media_type")),
         "name": media.get("title", ""),
         "description": media.get("description", ""),
         "year": str(media.get("release_year", "")),
@@ -845,7 +846,7 @@ async def get_meta(token: str, media_type: str, id: str, token_data: dict = Depe
         "runtime": media.get("runtime") or "",
     }
 
-    if media.get("media_type") == "movie":
+    if canonical_media_type(media.get("media_type")) == "movie":
         released_date = format_released_date(media)
         if released_date:
             meta_obj["released"] = released_date

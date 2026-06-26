@@ -2,6 +2,7 @@ import httpx
 import re
 import asyncio
 from typing import Optional, Dict, Any
+from Backend.helper.media_types import cinemeta_media_type
 
 BASE_URL = "https://v3-cinemeta.strem.io"
 
@@ -29,7 +30,7 @@ def extract_first_year(year_string) -> int:
 
 async def search_title(query: str, type: str) -> Optional[Dict[str, Any]]:
     client = await _get_client()
-    cinemeta_type = "series" if type == "tvSeries" else type
+    cinemeta_type = cinemeta_media_type(type)
     query = ".".join(query.strip().lower().split())
     url = f"{BASE_URL}/catalog/{cinemeta_type}/imdb/search={query}.json"
     try:
@@ -52,7 +53,7 @@ async def search_title(query: str, type: str) -> Optional[Dict[str, Any]]:
 
 async def get_detail(imdb_id: str, media_type: str) -> Optional[Dict[str, Any]]:
     client = await _get_client()
-    cinemeta_type = "series" if media_type in ["tvSeries", "tv"] else "movie"
+    cinemeta_type = cinemeta_media_type(media_type)
 
     try:
         url = f"{BASE_URL}/meta/{cinemeta_type}/{imdb_id}.json"

@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from Backend import db, StartTime, __version__
 from Backend.logger import LOGGER
 from Backend.helper.pyro import get_readable_time
+from Backend.helper.media_types import canonical_media_type
 from Backend.helper.metadata import (
     search_movie_candidates,
     search_tv_candidates,
@@ -259,11 +260,15 @@ async def list_media_api(
     page_size: int = Query(24, ge=1, le=100),
     search: str = Query("", max_length=100)
 ):
+    media_type = canonical_media_type(media_type)
     try:
         media_key = "movies" if media_type == "movie" else "tv_shows"
         if search:
             result = await db.search_documents(search, page, page_size)
-            filtered_results = [item for item in result['results'] if item.get('media_type') == media_type]
+            filtered_results = [
+                item for item in result['results']
+                if canonical_media_type(item.get('media_type', 'movie')) == media_type
+            ]
             total_filtered = len(filtered_results)
             start_index = (page - 1) * page_size
             end_index = start_index + page_size
@@ -294,6 +299,7 @@ async def delete_media_api(
     db_index: int,
     media_type: str = Query(pattern="^(movie|tv)$")
 ):
+    media_type = canonical_media_type(media_type)
     try:
         media_type_formatted = "Movie" if media_type == "movie" else "Series"
         result = await db.delete_document(media_type_formatted, tmdb_id, db_index)
@@ -310,6 +316,7 @@ async def update_media_api(
     db_index: int,
     media_type: str = Query(pattern="^(movie|tv)$")
 ):
+    media_type = canonical_media_type(media_type)
     try:
         update_data = await request.json()
         if 'rating' in update_data and update_data['rating']:
@@ -367,6 +374,7 @@ async def get_media_details_api(
     db_index: int,
     media_type: str = Query(pattern="^(movie|tv)$")
 ):
+    media_type = canonical_media_type(media_type)
     try:
         result = await db.get_document(media_type, tmdb_id, db_index)
         if result:
@@ -1053,21 +1061,22 @@ async def link_token_user_api(token: str, user_id: int) -> dict:
 
 
 async def search_media_rescan_api(media_type: str, query: str, year: int | None = None):
+    media_type = canonical_media_type(media_type)
     query = (query or "").strip()
     if not query:
         raise HTTPException(status_code=400, detail="query is required.")
 
     if media_type == "movie":
         results = await search_movie_candidates(query=query, year=year)
-    elif media_type == "tv":
-        results = await search_tv_candidates(query=query)
     else:
-        raise HTTPException(status_code=400, detail="Invalid media_type.")
+        results = await search_tv_candidates(query=query)
 
     return {"results": results}
 
 
 async def apply_media_rescan_api(request: Request, tmdb_id: int, db_index: int, media_type: str):
+    requested_media_type = media_type
+    media_type = canonical_media_type(media_type)
     body = await request.json()
     selected_id = str(body.get("selected_id") or "").strip()
 
@@ -1076,17 +1085,46 @@ async def apply_media_rescan_api(request: Request, tmdb_id: int, db_index: int, 
 
     current_doc = await db.get_document(media_type, tmdb_id, db_index)
     if not current_doc:
-        raise HTTPException(status_code=404, detail="Media not found.")
+        actual_type = await db.find_document_type(tmdb_id, db_index)
+        if actual_type:
+            LOGGER.warning(
+                "Metadata rescan type mismatch: tmdb_id=%s storage_%s requested=%s normalized=%s actual=%s",
+                tmdb_id, db_index, requested_media_type, media_type, actual_type,
+            )
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"This title is stored as {actual_type}. Reload the media page and open it "
+                    "from the correct category before rescanning metadata."
+                ),
+            )
+        LOGGER.warning(
+            "Metadata rescan target missing: tmdb_id=%s storage_%s requested=%s normalized=%s",
+            tmdb_id, db_index, requested_media_type, media_type,
+        )
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Media ID {tmdb_id} was not found in storage_{db_index}. Reload Media Management "
+                "and reopen the title before applying the metadata match."
+            ),
+        )
 
-    if media_type == "movie":
-        metadata = await fetch_selected_movie_metadata(selected_id)
-    elif media_type == "tv":
-        metadata = await fetch_selected_tv_metadata(selected_id)
-    else:
-        raise HTTPException(status_code=400, detail="Invalid media_type.")
+    metadata = (
+        await fetch_selected_movie_metadata(selected_id)
+        if media_type == "movie"
+        else await fetch_selected_tv_metadata(selected_id)
+    )
 
     if not metadata:
-        raise HTTPException(status_code=404, detail="Unable to fetch metadata for selected item.")
+        LOGGER.warning(
+            "Metadata rescan candidate unavailable: tmdb_id=%s storage_%s type=%s selected_id=%s",
+            tmdb_id, db_index, media_type, selected_id,
+        )
+        raise HTTPException(
+            status_code=404,
+            detail="The selected metadata record could not be loaded. Pick another result and try again.",
+        )
 
     updated_doc = await db.replace_media_metadata(
         media_type=media_type,
@@ -1096,6 +1134,10 @@ async def apply_media_rescan_api(request: Request, tmdb_id: int, db_index: int, 
     )
 
     if not updated_doc:
+        LOGGER.error(
+            "Metadata rescan replacement failed: tmdb_id=%s storage_%s type=%s",
+            tmdb_id, db_index, media_type,
+        )
         raise HTTPException(status_code=500, detail="Failed to replace media metadata.")
 
     return {
@@ -1105,13 +1147,13 @@ async def apply_media_rescan_api(request: Request, tmdb_id: int, db_index: int, 
         "db_index": updated_doc.get("db_index", db_index),
         "media_type": media_type,
         "data": updated_doc,
-}
+    }
 
 
 # --- Custom Catalog APIs ---
 
 def _normalize_media_type(media_type: str) -> str:
-    return "tv" if media_type in ["tv", "series"] else "movie"
+    return canonical_media_type(media_type)
 
 
 async def list_custom_catalogs_api(
@@ -1404,15 +1446,13 @@ async def search_media_for_subtitles_api(
 ):
     """Search movies/TV shows to populate the subtitle admin picker."""
     try:
+        media_type = canonical_media_type(media_type)
         data = await db.search_documents(query=q, page=1, page_size=12)
         all_items = data.get("results", data) if isinstance(data, dict) else data
-        # Filter by media_type if specified
-        if media_type in ("movie", "tv"):
-            all_items = [
-                m for m in all_items
-                if m.get("media_type", "") == media_type
-                or (media_type == "tv" and m.get("media_type", "") in ("tv", "series"))
-            ]
+        all_items = [
+            item for item in all_items
+            if canonical_media_type(item.get("media_type", "movie")) == media_type
+        ]
         return {"results": all_items}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

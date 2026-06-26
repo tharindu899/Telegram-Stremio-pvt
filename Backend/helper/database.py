@@ -14,6 +14,7 @@ import re
 from Backend.helper.encrypt import decode_string, encode_string
 from Backend.helper.modal import Episode, MovieSchema, QualityDetail, Season, TVShowSchema
 from Backend.helper.task_manager import delete_message
+from Backend.helper.media_types import canonical_media_type
 
 
 def convert_objectid_to_str(document: Dict[str, Any]) -> Dict[str, Any]:
@@ -478,7 +479,7 @@ class Database:
     async def add_item_to_custom_catalog(
         self, catalog_id: str, tmdb_id: int, db_index: int, media_type: str
     ) -> bool:
-        media_type = "tv" if media_type in ["tv", "series"] else "movie"
+        media_type = canonical_media_type(media_type)
         item = {
             "tmdb_id": int(tmdb_id),
             "db_index": int(db_index),
@@ -511,7 +512,7 @@ class Database:
     async def remove_item_from_custom_catalog(
         self, catalog_id: str, tmdb_id: int, db_index: int, media_type: str
     ) -> bool:
-        media_type = "tv" if media_type in ["tv", "series"] else "movie"
+        media_type = canonical_media_type(media_type)
         try:
             result = await self.dbs["tracking"]["custom_catalogs"].update_one(
                 {"_id": ObjectId(catalog_id)},
@@ -533,7 +534,7 @@ class Database:
     async def custom_catalog_contains_item(
         self, catalog_id: str, tmdb_id: int, db_index: int, media_type: str
     ) -> bool:
-        media_type = "tv" if media_type in ["tv", "series"] else "movie"
+        media_type = canonical_media_type(media_type)
         try:
             catalog = await self.dbs["tracking"]["custom_catalogs"].find_one({
                 "_id": ObjectId(catalog_id),
@@ -558,7 +559,7 @@ class Database:
 
         db_media_type = None
         if media_type:
-            db_media_type = "tv" if media_type in ["tv", "series"] else "movie"
+            db_media_type = canonical_media_type(media_type)
 
         raw_items = catalog.get("items", []) or []
         if db_media_type:
@@ -1173,6 +1174,10 @@ class Database:
         self, metadata_info: dict,
         channel: int, msg_id: int, size: str, name: str
     ) -> Optional[ObjectId]:
+        # Keep storage stable even when a provider reports tvMovie/tvMiniSeries.
+        metadata_info = dict(metadata_info or {})
+        metadata_info["media_type"] = canonical_media_type(metadata_info.get("media_type"))
+
         # Use the original Telegram message date as the media add date.
         # This keeps Stremio latest movie/series order stable after /scan or /rescan.
         date_added = self._coerce_datetime(metadata_info.get("date_added")) or datetime.utcnow()
@@ -1734,19 +1739,30 @@ class Database:
 
     async def get_document(self, media_type: str, tmdb_id: int, db_index: int) -> Optional[Dict[str, Any]]:
         db_key = f"storage_{db_index}"
-        if media_type.lower() in ["tv", "series"]:
+        if canonical_media_type(media_type) == "tv":
             collection_name = "tv"
         else:
             collection_name = "movie"
         document = await self.dbs[db_key][collection_name].find_one({"tmdb_id": int(tmdb_id)})
         return convert_objectid_to_str(document) if document else None
 
+    async def find_document_type(self, tmdb_id: int, db_index: int) -> Optional[str]:
+        """Return the collection type that currently owns a media record."""
+        db_key = f"storage_{db_index}"
+        storage = self.dbs.get(db_key)
+        if storage is None:
+            return None
+        for candidate in ("movie", "tv"):
+            if await storage[candidate].find_one({"tmdb_id": int(tmdb_id)}, {"_id": 1}):
+                return candidate
+        return None
+
     async def update_document(
         self, media_type: str, tmdb_id: int, db_index: int, update_data: Dict[str, Any]
     ):
         update_data.pop('_id', None)
         db_key = f"storage_{db_index}"
-        if media_type.lower() in ["tv", "series"]:
+        if canonical_media_type(media_type) == "tv":
             collection_name = "tv"
         else:
             collection_name = "movie"
@@ -1796,8 +1812,9 @@ class Database:
 
     async def delete_document(self, media_type: str, tmdb_id: int, db_index: int) -> bool:
         db_key = f"storage_{db_index}"
+        media_type = canonical_media_type(media_type)
 
-        if media_type == "Movie":
+        if media_type == "movie":
             doc = await self.dbs[db_key]["movie"].find_one({"tmdb_id": tmdb_id})
             if doc and "telegram" in doc:
                 for quality in doc["telegram"]:
@@ -2145,6 +2162,7 @@ class Database:
         """
         Flags a specific telegram quality entry as 'is_dead: True'.
         """
+        media_type = canonical_media_type(media_type)
         db_key = f"storage_{db_index}"
         
         if media_type == "movie":
@@ -2335,7 +2353,7 @@ class Database:
         metadata: Dict[str, Any]
     ) -> Optional[dict]:
         db_key = f"storage_{db_index}"
-        collection_name = "tv" if media_type.lower() in ["tv", "series"] else "movie"
+        collection_name = "tv" if canonical_media_type(media_type) == "tv" else "movie"
         collection = self.dbs[db_key][collection_name]
 
         current_doc = await collection.find_one({"tmdb_id": int(tmdb_id)})

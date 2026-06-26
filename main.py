@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from Backend import __version__, db
 from Backend.fastapi.security.credentials import require_auth
 from Backend.config import Telegram
+from Backend.helper.media_types import MEDIA_TYPE_QUERY_PATTERN
 from Backend.fastapi.routes.stream_routes import router as stream_router, decay_client_failures
 from Backend.fastapi.routes.stremio_routes import router as stremio_router
 from Backend.fastapi.routes.nuvio_badges import router as nuvio_badges_router
@@ -308,7 +309,7 @@ async def edit_media(request: Request, tmdb_id: int, db_index: int, media_type: 
 
 @app.get("/api/media/list")
 async def list_media(
-    media_type: str = Query("movie", pattern="^(movie|tv)$"),
+    media_type: str = Query("movie", pattern=MEDIA_TYPE_QUERY_PATTERN),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
     search: str = Query("", max_length=100),
@@ -514,7 +515,7 @@ async def delete_custom_catalog(catalog_id: str, _: bool = Depends(require_auth)
 @app.get("/api/custom-catalogs/search-media")
 async def search_catalog_media(
     query: str,
-    media_type: str = Query("movie", pattern="^(movie|tv)$"),
+    media_type: str = Query("movie", pattern=MEDIA_TYPE_QUERY_PATTERN),
     page: int = Query(1, ge=1),
     page_size: int = Query(12, ge=1, le=50),
     _: bool = Depends(require_auth)
@@ -544,7 +545,7 @@ async def update_auto_catalog_settings_route(payload: dict, _: bool = Depends(re
 @app.get("/api/custom-catalogs/{catalog_id}/items")
 async def get_custom_catalog_items(
     catalog_id: str,
-    media_type: str | None = Query(None, pattern="^(movie|tv)$"),
+    media_type: str | None = Query(None, pattern=MEDIA_TYPE_QUERY_PATTERN),
     page: int = Query(1, ge=1),
     page_size: int = Query(24, ge=1, le=100),
     _: bool = Depends(require_auth)
@@ -560,7 +561,7 @@ async def remove_custom_catalog_item(
     catalog_id: str,
     tmdb_id: int,
     db_index: int,
-    media_type: str = Query("movie", pattern="^(movie|tv)$"),
+    media_type: str = Query("movie", pattern=MEDIA_TYPE_QUERY_PATTERN),
     _: bool = Depends(require_auth)
 ):
     return await remove_custom_catalog_item_api(catalog_id, tmdb_id, db_index, media_type)

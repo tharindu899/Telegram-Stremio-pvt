@@ -10,6 +10,7 @@ from Backend.helper.pyro import get_readable_time
 from Backend import StartTime, __version__
 import time
 from Backend.helper.custom_dl import ACTIVE_STREAMS, RECENT_STREAMS
+from Backend.helper.media_types import canonical_media_type
 
 templates = Jinja2Templates(directory="Backend/fastapi/templates")
 
@@ -160,6 +161,7 @@ async def dashboard_page(request: Request, _: bool = Depends(require_auth)):
 
 
 async def media_management_page(request: Request, media_type: str = "movie", _: bool = Depends(require_auth)):
+    media_type = canonical_media_type(media_type)
     theme_name = request.session.get("theme", "dark_professional")
     theme = get_theme(theme_name)
     current_user = get_current_user(request)
@@ -174,6 +176,7 @@ async def media_management_page(request: Request, media_type: str = "movie", _: 
     })
 
 async def edit_media_page(request: Request, tmdb_id: int, db_index: int, media_type: str, _: bool = Depends(require_auth)):
+    media_type = canonical_media_type(media_type)
     theme_name = request.session.get("theme", "dark_professional")
     theme = get_theme(theme_name)
     current_user = get_current_user(request)
